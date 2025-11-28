@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>College Event Management System</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js for stats pie chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --primary: #1d4ed8;
+      --primary-dark: #1e3a8a;
+      --accent: #22c55e;
+      --warn: #f97316;
+      --danger: #b91c1c;
+      --bg-soft: #f4f6fc;
+      --card: #ffffff;
+      --muted: #6b7280;
+      --border: #d4d7f5;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #e0e7ff 0, #f9fafb 55%, #f3f4f6 100%);
+      color: #111827;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 1220px;
+      margin: 20px;
+    }
+
+    header.app-header {
+      background: linear-gradient(120deg, #020617, #0f172a, #111827);
+      color: #f9fafb;
+      padding: 14px 18px;
+      border-radius: 16px;
+      box-shadow: 0 14px 45px rgba(15, 23, 42, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .app-brand { display: flex; flex-direction: column; gap: 2px; }
+    .app-title { font-size: 20px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+    .app-sub { font-size: 12px; color: #9ca3af; }
+
+    .right-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+
+    .clock {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    .top-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .top-tab-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: rgba(15, 23, 42, 0.5);
+      color: #e5e7eb;
+      padding: 7px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s, transform 0.08s, box-shadow 0.12s;
+    }
+
+    .top-tab-btn span.icon { font-size: 14px; }
+
+    .top-tab-btn.active {
+      background: var(--primary);
+      color: #f9fafb;
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.7);
+    }
+
+    .top-tab-btn:hover { transform: translateY(-1px); }
+
+    main { margin-top: 18px; }
+
+    .window { display: none; animation: fadeIn 0.22s ease-out; }
+    .window.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px 16px 18px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+
+    .card-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+    .dot { width: 9px; height: 9px; border-radius: 999px; background: var(--primary); }
+
+    .card-sub { font-size: 12px; color: var(--muted); }
+
+    .field-group { margin-top: 10px; }
+
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+    .input, select, textarea {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f9fbff;
+      font-size: 13px;
+      outline: none;
+      transition: border 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+
+    .input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+      background: #ffffff;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 16px;
+      border-radius: 999px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--primary);
+      color: #f9fafb;
+      cursor: pointer;
+      gap: 6px;
+      transition: background 0.15s, transform 0.08s, box-shadow 0.12s;
+    }
+
+    .btn:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45); }
+    .btn:active { transform: translateY(0); box-shadow: none; }
+
+    .btn.secondary {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      box-shadow: none;
+    }
+
+    .btn.secondary:hover { background: rgba(37, 99, 235, 0.06); box-shadow: none; }
+
+    .btn.link { background: transparent; border: none; padding: 0; font-size: 12px; color: var(--primary); box-shadow: none; }
+    .btn.link:hover { text-decoration: underline; transform: none; box-shadow: none; }
+
+    .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .note.error { color: var(--danger); }
+    .note.success { color: #047857; }
+
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+    .tab-strip { display: inline-flex; background: #e5e7eb; border-radius: 999px; padding: 3px; margin-bottom: 10px; }
+    .sub-tab-btn { border-radius: 999px; border: none; background: transparent; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+    .sub-tab-btn.active { background: #ffffff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18); }
+
+    .sub-window { display: none; }
+    .sub-window.active { display: block; animation: fadeIn 0.18s ease-out; }
+
+    .tag { display: inline-flex; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .tag.entered { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
+    .tag.not-entered { background: rgba(249, 115, 22, 0.12); color: #ea580c; }
+
+    .event-card, .reg-card { border-radius: 12px; border: 1px solid #e5e7eb; padding: 10px 12px; margin-bottom: 10px; background: #fdfdff; }
+
+    .stat-pill { padding: 6px 10px; border-radius: 999px; background: #f9fafb; border: 1px solid #e5e7eb; font-size: 12px; }
+
+    .table-like { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+    .table-like th, .table-like td { border-bottom: 1px solid #e5e7eb; padding: 6px 4px; text-align: left; }
+    .table-like th { font-weight: 600; background: #eef2ff; }
+
+    .window-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #111827; display: flex; align-items: center; gap: 6px; }
+    .window-title span { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+    @media (max-width: 640px) {
+      header.app-header { flex-direction: column; align-items: flex-start; }
+      .right-header { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-brand">
+        <div class="app-title">College Event Management System</div>
+        <div class="app-sub" id="headerSub">Student & Admin windows with live time</div>
+      </div>
+      <div class="right-header">
+        <div class="clock" id="liveClock">--:-- --, --- -- ----</div>
+        <div class="top-tabs">
+          <button class="top-tab-btn active" data-window="studentWindow"><span class="icon">👨‍🎓</span> Student Window</button>
+          <button class="top-tab-btn" data-window="adminWindow"><span class="icon">🛡️</span> Admin Window</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- ================= STUDENT WINDOW ================= -->
+      <section id="studentWindow" class="window active">
+        <div class="window-title">Student Window <span>Account creation & event registration</span></div>
+
+        <div class="card" style="margin-bottom:16px; background: radial-gradient(circle at top left, #e0f2fe 0, #ffffff 55%);">
+          <div class="flex-between">
+            <div>
+              <div class="card-title"><span class="dot"></span>Student Portal</div>
+              <div class="card-sub">Step 1: Create account. Step 2: Login to see events.</div>
+            </div>
+            <div class="tab-strip">
+              <button class="sub-tab-btn active" data-sub="studentRegisterSub">Register</button>
+              <button class="sub-tab-btn" data-sub="studentLoginSub">Login</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Student Registration Sub-window -->
+        <div class="sub-window active" id="studentRegisterSub">
+          <div class="grid-2">
+            <div class="card" style="background: radial-gradient(circle at top, #dcfce7 0, #ffffff 55%);">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#22c55e;"></span>Create Student Account</div>
+                  <div class="card-sub">Only @stpetershyd.com emails are accepted.</div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Full Name</label>
+                <input id="regName" class="input" placeholder="Your full name" />
+              </div>
+              <div class="field-group">
+                <label>Roll Number</label>
+                <input id="regRoll" class="input" placeholder="e.g. 21A91A05G1" />
+              </div>
+              <div class="field-group">
+                <label>College Email (@stpetershyd.com)</label>
+                <input id="regEmail" class="input" placeholder="name@stpetershyd.com" />
+              </div>
+              <div class="field-group">
+                <label>Password</label>
+                <input id="regPass" type="password" class="input" placeholder="Min 6 characters" />
+              </div>
+
+              <div class="field-group">
+                <button class="btn" id="regBtn">Register as Student</button>
+                <button class="btn secondary" id="regClear">Reset</button>
+              </div>
+
+              <div id="regMsg" class="note"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#0ea5e9;"></span>Why these details?</div>
+                  <div class="card-sub">Explanation for project viva.</div>
+                </div>
+              </div>
+              <ul class="note" style="padding-left:18px; margin-top:4px;">
+                <li>Full name: used on certificates & reports.</li>
+                <li>Roll number: unique ID inside college.</li>
+                <li>College email: ensures only official students use the portal.</li>
+                <li>Password: used for login, stored locally in browser (demo, no backend).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Student Login Sub-window -->
+        <div class="sub-window" id="studentLoginSub">
+          <div class="grid-2">
+            <div class="card" style="background: radial-gradient(circle at top, #eef2ff 0, #ffffff 55%);">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot"></span>Student Login</div>
+                  <div class="card-sub">After login, events and registration will be visible.</div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Email (must be @stpetershyd.com)</label>
+                <input id="loginEmail" class="input" placeholder="name@stpetershyd.com" />
+              </div>
+              <div class="field-group">
+                <label>Password</label>
+                <input id="loginPass" type="password" class="input" placeholder="Your password" />
+              </div>
+
+              <div class="field-group">
+                <button class="btn" id="loginBtn">Login as Student</button>
+                <button class="btn secondary" id="clearLoginBtn">Clear</button>
+              </div>
+
+              <div class="field-group">
+                <button class="btn link" id="forgotToggle">Forgot password?</button>
+              </div>
+
+              <div id="loginMsg" class="note"></div>
+            </div>
+
+            <div class="card" id="forgotCard">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#f97316;"></span>Reset Password (Demo)</div>
+                  <div class="card-sub">Reset using college email only (no OTP).</div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Registered College Email</label>
+                <input id="fpEmail" class="input" placeholder="name@stpetershyd.com" />
+              </div>
+              <div class="field-group">
+                <label>New Password</label>
+                <input id="fpNewPass" type="password" class="input" placeholder="New password (min 6 chars)" />
+              </div>
+              <div class="field-group">
+                <button class="btn" id="fpSubmit">Update Password</button>
+                <button class="btn secondary" id="fpClear">Clear</button>
+              </div>
+              <div id="fpMsg" class="note"></div>
+
+              <div class="note" style="margin-top:10px;">* Real systems use email OTP / reset link. Here it is simplified for academic demo.</div>
+            </div>
+          </div>
+
+          <!-- After-login area: events + registrations (only after login) -->
+          <div id="studentAfterLogin" class="grid-2" style="margin-top:16px; display:none;">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#22c55e;"></span>Available Events</div>
+                  <div class="card-sub">Displayed only after successful login.</div>
+                </div>
+              </div>
+              <div id="eventsList" class="note" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#6366f1;"></span>My Registrations</div>
+                  <div class="card-sub">Contains your unique entry codes.</div>
+                </div>
+              </div>
+              <div id="myRegs" class="note" style="margin-top:8px;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ADMIN WINDOW ================= -->
+      <section id="adminWindow" class="window">
+        <div class="window-title">Admin Window <span>Event creation & entry verification</span></div>
+
+        <!-- Admin Login Card -->
+        <div class="card" style="margin-bottom:16px; background: radial-gradient(circle at top right, #fee2e2 0, #ffffff 55%);">
+          <div class="flex-between">
+            <div>
+              <div class="card-title"><span class="dot" style="background:#f97316;"></span>Admin Portal</div>
+              <div class="card-sub">Only coordinators / staff should login here.</div>
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-top:10px;">
+            <div>
+              <div class="field-group">
+                <label>Admin Email</label>
+                <input id="adminEmail" class="input" placeholder="admin@college.edu" />
+              </div>
+              <div class="field-group">
+                <label>Password</label>
+                <input id="adminPass" type="password" class="input" placeholder="Admin password" />
+              </div>
+              <div class="field-group">
+                <button class="btn" id="adminLoginBtn">Login as Admin</button>
+                <button class="btn secondary" id="adminClearBtn">Clear</button>
+              </div>
+              <div id="adminLoginMsg" class="note"></div>
+            </div>
+
+            <div>
+              <div class="note"><b>Demo Admin Credentials</b></div>
+              <div class="note">Email: <b>admin@college.edu</b></div>
+              <div class="note">Password: <b>Admin@123</b></div>
+              <div class="note" style="margin-top:8px;">Post login:</div>
+              <ul class="note" style="padding-left:18px; margin-top:4px;">
+                <li>Create & manage events.</li>
+                <li>View registration stats with pie chart.</li>
+                <li>Type student entry code and verify details.</li>
+                <li>Mark students as ENTERED for event hall access.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Dashboard (hidden until admin login) -->
+        <div id="adminDashboard" style="display:none;">
+          <div class="grid-2">
+            <!-- Create/manage events -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot"></span>Create New Event</div>
+                  <div class="card-sub">Events here will be shown to students after login.</div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Title</label>
+                <input id="evTitle" class="input" placeholder="e.g. Technical Quiz" />
+              </div>
+              <div class="field-group">
+                <label>Date</label>
+                <input id="evDate" type="date" class="input" />
+              </div>
+              <div class="field-group">
+                <label>Time</label>
+                <input id="evTime" type="time" class="input" />
+              </div>
+              <div class="field-group">
+                <label>Venue</label>
+                <input id="evVenue" class="input" placeholder="Main Auditorium / Lab-1" />
+              </div>
+              <div class="field-group">
+                <label>Description</label>
+                <textarea id="evDesc" rows="3" class="input" placeholder="Short info about the event."></textarea>
+              </div>
+
+              <div class="field-group">
+                <button class="btn" id="createEventBtn">Create Event</button>
+                <button class="btn secondary" id="clearEventBtn">Clear</button>
+              </div>
+
+              <div id="eventMsg" class="note"></div>
+            </div>
+
+            <!-- Existing events -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#22c55e;"></span>Events List</div>
+                  <div class="card-sub">Edit / delete existing events.</div>
+                </div>
+              </div>
+              <div id="eventsAdminList" class="note" style="margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-top:18px;">
+            <!-- Entry code check -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#f97316;"></span>Entry Code Verification</div>
+                  <div class="card-sub">Type code, view student & event, then allow entry.</div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Entry Code (given by student)</label>
+                <input id="entryCodeInput" class="input" placeholder="e.g. BLUE-TIGER-STAR-456" />
+              </div>
+              <div class="field-group">
+                <button class="btn" id="findCodeBtn">Find Details</button>
+                <button class="btn secondary" id="clearEntryBtn">Clear</button>
+              </div>
+              <div id="entryMsg" class="note"></div>
+
+              <div id="entryDetailCard" class="note" style="margin-top:10px;"></div>
+            </div>
+
+            <!-- Stats + chart -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title"><span class="dot" style="background:#6366f1;"></span>Live Stats</div>
+                  <div class="card-sub">Registrations vs entries across all events.</div>
+                </div>
+              </div>
+
+              <div id="statsRow" class="row" style="margin-top:4px;"></div>
+              <canvas id="regChart" style="max-width:360px; margin-top:12px;"></canvas>
+
+              <div class="field-group" style="margin-top:14px;">
+                <div style="font-size:13px; font-weight:600; margin-bottom:4px;">Per-event summary</div>
+                <table class="table-like" id="eventSummaryTable">
+                  <thead>
+                    <tr>
+                      <th>Event</th>
+                      <th>Registered</th>
+                      <th>Entered</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Registrations list -->
+          <div class="card" style="margin-top:18px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><span class="dot" style="background:#0ea5e9;"></span>All Registrations</div>
+                <div class="card-sub">Detailed view of all students & their codes.</div>
+              </div>
+            </div>
+            <div id="regsList" class="note" style="margin-top:10px;"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ============== Storage helpers ==============
+    function getStudents() {
+      try { return JSON.parse(localStorage.getItem('students')) || []; } catch (e) { return []; }
+    }
+    function saveStudents(list) { localStorage.setItem('students', JSON.stringify(list)); }
+
+    function getEvents() {
+      try { return JSON.parse(localStorage.getItem('events')) || []; } catch (e) { return []; }
+    }
+    function saveEvents(list) { localStorage.setItem('events', JSON.stringify(list)); }
+
+    function getRegs() {
+      try { return JSON.parse(localStorage.getItem('registrations')) || []; } catch (e) { return []; }
+    }
+    function saveRegs(list) { localStorage.setItem('registrations', JSON.stringify(list)); }
+
+    // ============== Live clock ==============
+    function updateClock() {
+      const el = document.getElementById('liveClock');
+      const now = new Date();
+      const datePart = now.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' });
+      const timePart = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      el.textContent = timePart + ' · ' + datePart;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ============== Top-level windows (Student / Admin) ==============
+    const windows = document.querySelectorAll('.window');
+    const topTabs = document.querySelectorAll('.top-tab-btn');
+    const headerSub = document.getElementById('headerSub');
+    const adminDashboard = document.getElementById('adminDashboard');
+
+    const windowDescriptions = {
+      studentWindow: 'Student window: registration & login',
+      adminWindow: 'Admin window: event management & entry verification'
+    };
+
+    topTabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.window;
+        windows.forEach(w => w.classList.remove('active'));
+        document.getElementById(target).classList.add('active');
+
+        topTabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+
+        headerSub.textContent = windowDescriptions[target] || 'College Event System';
+
+        if (target === 'adminWindow') {
+          const adminLogged = localStorage.getItem('currentAdmin') === 'true';
+          adminDashboard.style.display = adminLogged ? 'block' : 'none';
+          if (adminLogged) {
+            renderEventsAdmin();
+            renderRegistrationsAdmin();
+          }
+        }
+        if (target === 'studentWindow') {
+          const current = localStorage.getItem('currentStudent');
+          if (current) {
+            document.getElementById('studentAfterLogin').style.display = 'grid';
+            renderEventsStudent();
+            renderMyRegistrations();
+          } else {
+            document.getElementById('studentAfterLogin').style.display = 'none';
+          }
+        }
+      });
+    });
+
+    // ============== Student window: sub tabs (register / login) ==============
+    const subBtns = document.querySelectorAll('.sub-tab-btn');
+    const subWindows = document.querySelectorAll('.sub-window');
+
+    subBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.sub;
+        subWindows.forEach(s => s.classList.remove('active'));
+        document.getElementById(target).classList.add('active');
+        subBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // ============== Entry code generator (unique) ==============
+    const CODE_PARTS = ['BLUE','TIGER','STAR','CLOUD','NOVA','ALPHA','BETA','GAMMA','PIXEL','RIDER','FLASH','EAGLE','NEXA','ZION','QUARK','ZEN','VORTEX','EMBER','BLAZE','NIGHT'];
+
+    function generateCodeOnce() {
+      function pick() { return CODE_PARTS[Math.floor(Math.random() * CODE_PARTS.length)]; }
+      const randNum = Math.floor(100 + Math.random() * 900);
+      return pick() + '-' + pick() + '-' + pick() + '-' + randNum;
+    }
+
+    function generateUniqueEntryCode() {
+      const regs = getRegs();
+      let code;
+      let exists = true;
+      let safety = 0;
+      while (exists && safety < 1000) {
+        safety++;
+        code = generateCodeOnce();
+        exists = regs.some(r => (r.entryCode || '').toUpperCase() === code.toUpperCase());
+      }
+      return code;
+    }
+
+    // ============== Student Registration ==============
+    const regMsg = document.getElementById('regMsg');
+
+    document.getElementById('regBtn').addEventListener('click', () => {
+      const name = document.getElementById('regName').value.trim();
+      const roll = document.getElementById('regRoll').value.trim();
+      const email = document.getElementById('regEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('regPass').value;
+
+      if (!name || !roll || !email || pass.length < 6) {
+        regMsg.textContent = 'Fill all fields. Password must be at least 6 characters.';
+        regMsg.className = 'note error';
+        return;
+      }
+      if (!email.endsWith('@stpetershyd.com')) {
+        regMsg.textContent = 'Email must be a college email (ends with @stpetershyd.com).';
+        regMsg.className = 'note error';
+        return;
+      }
+
+      let students = getStudents();
+      if (students.find(s => s.email === email)) {
+        regMsg.textContent = 'Email already registered. Use login.';
+        regMsg.className = 'note error';
+        return;
+      }
+
+      students.push({ name, roll, email, password: pass });
+      saveStudents(students);
+
+      regMsg.textContent = 'Registration successful. You can now login as a student.';
+      regMsg.className = 'note success';
+
+      document.getElementById('regName').value = '';
+      document.getElementById('regRoll').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPass').value = '';
+    });
+
+    document.getElementById('regClear').addEventListener('click', () => {
+      document.getElementById('regName').value = '';
+      document.getElementById('regRoll').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPass').value = '';
+      regMsg.textContent = '';
+      regMsg.className = 'note';
+    });
+
+    // ============== Student Login ==============
+    const loginMsg = document.getElementById('loginMsg');
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('loginPass').value;
+
+      loginMsg.textContent = '';
+      loginMsg.className = 'note';
+
+      if (!email.endsWith('@stpetershyd.com')) {
+        loginMsg.textContent = 'Use your college email (must end with @stpetershyd.com).';
+        loginMsg.className = 'note error';
+        return;
+      }
+
+      const students = getStudents();
+      const user = students.find(s => s.email === email && s.password === pass);
+
+      if (!user) {
+        loginMsg.textContent = 'Wrong email or password.';
+        loginMsg.className = 'note error';
+        return;
+      }
+
+      localStorage.setItem('currentStudent', email);
+      loginMsg.textContent = 'Login successful. Event list is now visible below.';
+      loginMsg.className = 'note success';
+
+      const after = document.getElementById('studentAfterLogin');
+      after.style.display = 'grid';
+      renderEventsStudent();
+      renderMyRegistrations();
+    });
+
+    document.getElementById('clearLoginBtn').addEventListener('click', () => {
+      document.getElementById('loginEmail').value = '';
+      document.getElementById('loginPass').value = '';
+      loginMsg.textContent = '';
+      loginMsg.className = 'note';
+      document.getElementById('studentAfterLogin').style.display = 'none';
+    });
+
+    // Forgot password (demo)
+    const fpMsg = document.getElementById('fpMsg');
+
+    document.getElementById('forgotToggle').addEventListener('click', () => {
+      document.getElementById('fpEmail').focus();
+    });
+
+    document.getElementById('fpSubmit').addEventListener('click', () => {
+      const email = document.getElementById('fpEmail').value.trim().toLowerCase();
+      const newPass = document.getElementById('fpNewPass').value;
+
+      fpMsg.textContent = '';
+      fpMsg.className = 'note';
+
+      if (!email.endsWith('@stpetershyd.com')) {
+        fpMsg.textContent = 'Use your registered college email.';
+        fpMsg.className = 'note error';
+        return;
+      }
+      if (newPass.length < 6) {
+        fpMsg.textContent = 'New password must be at least 6 characters.';
+        fpMsg.className = 'note error';
+        return;
+      }
+
+      let students = getStudents();
+      let found = false;
+      students = students.map(s => {
+        if (s.email === email) {
+          found = true;
+          return { ...s, password: newPass };
+        }
+        return s;
+      });
+
+      if (!found) {
+        fpMsg.textContent = 'No account found for this email.';
+        fpMsg.className = 'note error';
+        return;
+      }
+
+      saveStudents(students);
+      fpMsg.textContent = 'Password updated successfully. You can login now.';
+      fpMsg.className = 'note success';
+      document.getElementById('fpEmail').value = '';
+      document.getElementById('fpNewPass').value = '';
+    });
+
+    document.getElementById('fpClear').addEventListener('click', () => {
+      document.getElementById('fpEmail').value = '';
+      document.getElementById('fpNewPass').value = '';
+      fpMsg.textContent = '';
+      fpMsg.className = 'note';
+    });
+
+    // ============== Student: Events + Registrations (only after login) ==============
+    function renderEventsStudent() {
+      const list = document.getElementById('eventsList');
+      const events = getEvents();
+      const current = localStorage.getItem('currentStudent');
+      const regs = getRegs().filter(r => r.studentEmail === current);
+      list.innerHTML = '';
+
+      if (!current) {
+        list.textContent = 'Login to see events.';
+        return;
+      }
+
+      if (events.length === 0) {
+        list.textContent = 'No events created yet. Ask admin to add events.';
+        return;
+      }
+
+      events.forEach(ev => {
+        const already = regs.find(r => r.eventId === ev.id);
+        const div = document.createElement('div');
+        div.className = 'event-card';
+        div.innerHTML = `
+          <div class="flex-between">
+            <div>
+              <div style="font-weight:600;">${ev.title}</div>
+              <div class="note">${ev.date || ''} ${ev.time ? '• ' + ev.time : ''} ${ev.venue ? '• ' + ev.venue : ''}</div>
+            </div>
+            <div>
+              ${
+                already
+                  ? '<span class="tag not-entered">Registered</span>'
+                  : `<button class="btn" style="padding:5px 10px;font-size:11px;" data-evid="${ev.id}">Register</button>`
+              }
+            </div>
+          </div>
+          <div class="note" style="margin-top:6px;">${ev.desc || ''}</div>
+        `;
+        list.appendChild(div);
+      });
+
+      list.querySelectorAll('button[data-evid]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-evid');
+          registerForEvent(id);
+        });
+      });
+    }
+
+    function registerForEvent(eventId) {
+      const current = localStorage.getItem('currentStudent');
+      if (!current) {
+        alert('Please login as student first.');
+        return;
+      }
+      const students = getStudents();
+      const stu = students.find(s => s.email === current);
+      if (!stu) {
+        alert('Student record not found.');
+        return;
+      }
+
+      let regs = getRegs();
+      if (regs.find(r => r.eventId === eventId && r.studentEmail === current)) {
+        alert('Already registered for this event.');
+        return;
+      }
+
+      const entryCode = generateUniqueEntryCode();
+      regs.push({
+        eventId,
+        studentEmail: current,
+        roll: stu.roll,
+        ts: Date.now(),
+        status: 'not-entered',
+        entryCode
+      });
+      saveRegs(regs);
+
+      alert('Registered successfully. Your entry code: ' + entryCode);
+      renderEventsStudent();
+      renderMyRegistrations();
+      renderRegistrationsAdmin(); // refresh admin stats if logged
+    }
+
+    function renderMyRegistrations() {
+      const wrap = document.getElementById('myRegs');
+      const current = localStorage.getItem('currentStudent');
+      const regs = getRegs().filter(r => r.studentEmail === current);
+      const events = getEvents();
+      wrap.innerHTML = '';
+
+      if (!current) {
+        wrap.textContent = 'Login to see your registrations.';
+        return;
+      }
+
+      if (regs.length === 0) {
+        wrap.textContent = 'No registrations yet.';
+        return;
+      }
+
+      regs.forEach(r => {
+        const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
+        const tag = r.status === 'entered'
+          ? '<span class="tag entered">Entered</span>'
+          : '<span class="tag not-entered">Not Entered</span>';
+        const div = document.createElement('div');
+        div.className = 'reg-card';
+        div.innerHTML = `
+          <div class="flex-between">
+            <div>
+              <div style="font-weight:600;">${ev.title} ${tag}</div>
+              <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
+              <div class="note"><b>Entry Code:</b> ${r.entryCode || 'N/A'}</div>
+              <div class="note">Show this code to the admin at the entry gate.</div>
+            </div>
+          </div>
+        `;
+        wrap.appendChild(div);
+      });
+    }
+
+    // ============== Admin Login ==============
+    const ADMIN_EMAIL = 'admin@college.edu';
+    const ADMIN_PASS = 'Admin@123';
+    const adminLoginMsg = document.getElementById('adminLoginMsg');
+
+    document.getElementById('adminLoginBtn').addEventListener('click', () => {
+      const email = document.getElementById('adminEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('adminPass').value;
+
+      adminLoginMsg.textContent = '';
+      adminLoginMsg.className = 'note';
+
+      if (email === ADMIN_EMAIL && pass === ADMIN_PASS) {
+        localStorage.setItem('currentAdmin', 'true');
+        adminLoginMsg.textContent = 'Admin login successful.';
+        adminLoginMsg.className = 'note success';
+        adminDashboard.style.display = 'block';
+        renderEventsAdmin();
+        renderRegistrationsAdmin();
+      } else {
+        adminLoginMsg.textContent = 'Invalid admin credentials.';
+        adminLoginMsg.className = 'note error';
+        adminDashboard.style.display = 'none';
+      }
+    });
+
+    document.getElementById('adminClearBtn').addEventListener('click', () => {
+      document.getElementById('adminEmail').value = '';
+      document.getElementById('adminPass').value = '';
+      adminLoginMsg.textContent = '';
+      adminLoginMsg.className = 'note';
+      adminDashboard.style.display = 'none';
+      localStorage.removeItem('currentAdmin');
+    });
+
+    // ============== Admin: create / edit / delete events ==============
+    const eventMsg = document.getElementById('eventMsg');
+
+    document.getElementById('createEventBtn').addEventListener('click', () => {
+      const title = document.getElementById('evTitle').value.trim();
+      const date = document.getElementById('evDate').value;
+      const time = document.getElementById('evTime').value;
+      const venue = document.getElementById('evVenue').value.trim();
+      const desc = document.getElementById('evDesc').value.trim();
+
+      if (!title || !date) {
+        eventMsg.textContent = 'Title and Date are required.';
+        eventMsg.className = 'note error';
+        return;
+      }
+
+      const events = getEvents();
+      const id = 'ev_' + Date.now();
+      events.push({ id, title, date, time, venue, desc });
+      saveEvents(events);
+
+      eventMsg.textContent = 'Event created successfully.';
+      eventMsg.className = 'note success';
+
+      document.getElementById('evTitle').value = '';
+      document.getElementById('evDate').value = '';
+      document.getElementById('evTime').value = '';
+      document.getElementById('evVenue').value = '';
+      document.getElementById('evDesc').value = '';
+
+      renderEventsAdmin();
+    });
+
+    document.getElementById('clearEventBtn').addEventListener('click', () => {
+      document.getElementById('evTitle').value = '';
+      document.getElementById('evDate').value = '';
+      document.getElementById('evTime').value = '';
+      document.getElementById('evVenue').value = '';
+      document.getElementById('evDesc').value = '';
+      eventMsg.textContent = '';
+      eventMsg.className = 'note';
+    });
+
+    function renderEventsAdmin() {
+      const wrap = document.getElementById('eventsAdminList');
+      const events = getEvents();
+      wrap.innerHTML = '';
+
+      if (events.length === 0) {
+        wrap.textContent = 'No events created yet.';
+        return;
+      }
+
+      events.forEach(ev => {
+        const div = document.createElement('div');
+        div.className = 'event-card';
+        div.innerHTML = `
+          <div class="flex-between">
+            <div>
+              <div style="font-weight:600;">${ev.title}</div>
+              <div class="note">${ev.date || ''} ${ev.time ? '• ' + ev.time : ''} ${ev.venue ? '• ' + ev.venue : ''}</div>
+            </div>
+            <div class="row">
+              <button class="btn secondary" style="padding:4px 10px;font-size:11px;" data-edit="${ev.id}">Edit</button>
+              <button class="btn" style="padding:4px 10px;font-size:11px;" data-del="${ev.id}">Delete</button>
+            </div>
+          </div>
+          <div class="note" style="margin-top:6px;">${ev.desc || ''}</div>
+        `;
+        wrap.appendChild(div);
+      });
+
+      wrap.querySelectorAll('button[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-del');
+          deleteEvent(id);
+        });
+      });
+
+      wrap.querySelectorAll('button[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-edit');
+          editEvent(id);
+        });
+      });
+    }
+
+    function deleteEvent(id) {
+      if (!confirm('Delete this event? All registrations for this event will be removed.')) return;
+      let events = getEvents().filter(e => e.id !== id);
+      saveEvents(events);
+      const regs = getRegs().filter(r => r.eventId !== id);
+      saveRegs(regs);
+      renderEventsAdmin();
+      renderRegistrationsAdmin();
+      const current = localStorage.getItem('currentStudent');
+      if (current) {
+        renderEventsStudent();
+        renderMyRegistrations();
+      }
+    }
+
+    function editEvent(id) {
+      const events = getEvents();
+      const ev = events.find(e => e.id === id);
+      if (!ev) return;
+      const title = prompt('Title', ev.title) || ev.title;
+      const date = prompt('Date (YYYY-MM-DD)', ev.date) || ev.date;
+      const time = prompt('Time (HH:MM)', ev.time || '') || ev.time;
+      const venue = prompt('Venue', ev.venue || '') || ev.venue;
+      const desc = prompt('Description', ev.desc || '') || ev.desc;
+      ev.title = title;
+      ev.date = date;
+      ev.time = time;
+      ev.venue = venue;
+      ev.desc = desc;
+      saveEvents(events);
+      renderEventsAdmin();
+      const current = localStorage.getItem('currentStudent');
+      if (current) renderEventsStudent();
+    }
+
+    // ============== Admin: entry code verification ==============
+    const entryMsg = document.getElementById('entryMsg');
+    const entryDetailCard = document.getElementById('entryDetailCard');
+    let lastFoundCode = null;
+
+    document.getElementById('findCodeBtn').addEventListener('click', () => {
+      const code = document.getElementById('entryCodeInput').value.trim().toUpperCase();
+      entryMsg.textContent = '';
+      entryMsg.className = 'note';
+      entryDetailCard.innerHTML = '';
+
+      if (!code) {
+        entryMsg.textContent = 'Enter an entry code.';
+        entryMsg.className = 'note error';
+        return;
+      }
+
+      const regs = getRegs();
+      const idx = regs.findIndex(r => (r.entryCode || '').toUpperCase() === code);
+      if (idx === -1) {
+        entryMsg.textContent = 'No registration found for this code.';
+        entryMsg.className = 'note error';
+        return;
+      }
+
+      const r = regs[idx];
+      const students = getStudents();
+      const events = getEvents();
+      const stu = students.find(s => s.email === r.studentEmail) || { name: r.studentEmail, roll: r.roll || 'NA' };
+      const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
+
+      const tag = r.status === 'entered'
+        ? '<span class="tag entered">Already Entered</span>'
+        : '<span class="tag not-entered">Not Entered</span>';
+
+      entryDetailCard.innerHTML = `
+        <div class="reg-card">
+          <div class="flex-between">
+            <div>
+              <div style="font-weight:600;">${stu.name} (${stu.roll}) ${tag}</div>
+              <div class="note">${stu.email}</div>
+              <div class="note">Event: ${ev.title}</div>
+              <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
+              <div class="note"><b>Entry Code:</b> ${r.entryCode}</div>
+            </div>
+          </div>
+          <div class="field-group" style="margin-top:8px;">
+            <button class="btn" id="markEntryNow">Mark as ENTERED</button>
+          </div>
+        </div>
+      `;
+
+      lastFoundCode = code;
+      entryMsg.textContent = 'If details are correct, click Mark as ENTERED.';
+      entryMsg.className = 'note';
+
+      const markBtn = document.getElementById('markEntryNow');
+      markBtn.addEventListener('click', () => {
+        markEntryByCode(lastFoundCode);
+      });
+    });
+
+    function markEntryByCode(code) {
+      let regs = getRegs();
+      let found = false;
+      regs = regs.map(r => {
+        if ((r.entryCode || '').toUpperCase() === code) {
+          found = true;
+          return { ...r, status: 'entered' };
+        }
+        return r;
+      });
+
+      if (!found) {
+        entryMsg.textContent = 'Could not find registration to update.';
+        entryMsg.className = 'note error';
+        return;
+      }
+
+      saveRegs(regs);
+      entryMsg.textContent = 'Entry marked as ENTERED for code: ' + code;
+      entryMsg.className = 'note success';
+      entryDetailCard.innerHTML = '';
+      document.getElementById('entryCodeInput').value = '';
+      renderRegistrationsAdmin();
+      const current = localStorage.getItem('currentStudent');
+      if (current) renderMyRegistrations();
+    }
+
+    document.getElementById('clearEntryBtn').addEventListener('click', () => {
+      document.getElementById('entryCodeInput').value = '';
+      entryMsg.textContent = '';
+      entryMsg.className = 'note';
+      entryDetailCard.innerHTML = '';
+    });
+
+    // ============== Admin: registrations + stats + chart ==============
+    let regChart = null;
+
+    function renderRegistrationsAdmin() {
+      const regsWrap = document.getElementById('regsList');
+      const statsRow = document.getElementById('statsRow');
+      const tblBody = document.querySelector('#eventSummaryTable tbody');
+      const regs = getRegs();
+      const students = getStudents();
+      const events = getEvents();
+
+      regsWrap.innerHTML = '';
+      statsRow.innerHTML = '';
+      tblBody.innerHTML = '';
+
+      const total = regs.length;
+      let entered = 0;
+      regs.forEach(r => { if (r.status === 'entered') entered++; });
+      const notEntered = total - entered;
+
+      statsRow.innerHTML = `
+        <div class="stat-pill">Total Registered: <b>${total}</b></div>
+        <div class="stat-pill">Entered: <b>${entered}</b></div>
+        <div class="stat-pill">Not Entered: <b>${notEntered}</b></div>
+      `;
+
+      const ctx = document.getElementById('regChart').getContext('2d');
+      if (regChart) regChart.destroy();
+      regChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Entered', 'Not Entered'],
+          datasets: [{
+            data: [entered, notEntered],
+            backgroundColor: ['#22c55e', '#f97316']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+
+      if (regs.length === 0) {
+        regsWrap.textContent = 'No registrations yet.';
+        return;
+      }
+
+      // Per-event summary
+      const eventStats = {};
+      events.forEach(e => {
+        eventStats[e.id] = { title: e.title, reg: 0, ent: 0 };
+      });
+      regs.forEach(r => {
+        if (!eventStats[r.eventId]) {
+          eventStats[r.eventId] = { title: '[Deleted Event]', reg: 0, ent: 0 };
+        }
+        eventStats[r.eventId].reg++;
+        if (r.status === 'entered') eventStats[r.eventId].ent++;
+      });
+
+      Object.values(eventStats).forEach(st => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${st.title}</td>
+          <td>${st.reg}</td>
+          <td>${st.ent}</td>
+        `;
+        tblBody.appendChild(tr);
+      });
+
+      // Detailed registration cards
+      regs.forEach(r => {
+        const stu = students.find(s => s.email === r.studentEmail) || { name: r.studentEmail, roll: r.roll || 'NA' };
+        const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
+        const card = document.createElement('div');
+        card.className = 'reg-card';
+        const tag = r.status === 'entered'
+          ? '<span class="tag entered">Entered</span>'
+          : '<span class="tag not-entered">Not Entered</span>';
+        card.innerHTML = `
+          <div class="flex-between">
+            <div>
+              <div style="font-weight:600;">${stu.name} (${stu.roll}) ${tag}</div>
+              <div class="note">${stu.email}</div>
+              <div class="note">Event: ${ev.title}</div>
+              <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
+              <div class="note"><b>Entry Code:</b> ${r.entryCode || 'N/A'}</div>
+            </div>
+          </div>
+        `;
+        regsWrap.appendChild(card);
+      });
+    }
+
+    // ============== Initial load ==============
+    (function init() {
+      const currentStudent = localStorage.getItem('currentStudent');
+      if (currentStudent) {
+        document.getElementById('studentAfterLogin').style.display = 'grid';
+        renderEventsStudent();
+        renderMyRegistrations();
+      }
+      const admin = localStorage.getItem('currentAdmin') === 'true';
+      adminDashboard.style.display = admin ? 'block' : 'none';
+      if (admin) {
+        renderEventsAdmin();
+        renderRegistrationsAdmin();
+      }
+    })();
+  </script>
+</body>
+</html>
