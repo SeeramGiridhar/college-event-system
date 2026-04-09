@@ -567,6 +567,15 @@
     }
     function saveRegs(list) { localStorage.setItem('registrations', JSON.stringify(list)); }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // ============== Live clock ==============
     function updateClock() {
       const el = document.getElementById('liveClock');
@@ -825,11 +834,17 @@
         const already = regs.find(r => r.eventId === ev.id);
         const div = document.createElement('div');
         div.className = 'event-card';
+        const safeTitle = escapeHtml(ev.title);
+        const safeMeta = [ev.date || '', ev.time || '', ev.venue || '']
+          .filter(Boolean)
+          .map(escapeHtml)
+          .join(' • ');
+        const safeDesc = escapeHtml(ev.desc || '');
         div.innerHTML = `
           <div class="flex-between">
             <div>
-              <div style="font-weight:600;">${ev.title}</div>
-              <div class="note">${ev.date || ''} ${ev.time ? '• ' + ev.time : ''} ${ev.venue ? '• ' + ev.venue : ''}</div>
+              <div style="font-weight:600;">${safeTitle}</div>
+              <div class="note">${safeMeta}</div>
             </div>
             <div>
               ${
@@ -839,7 +854,7 @@
               }
             </div>
           </div>
-          <div class="note" style="margin-top:6px;">${ev.desc || ''}</div>
+          <div class="note" style="margin-top:6px;">${safeDesc}</div>
         `;
         list.appendChild(div);
       });
@@ -907,6 +922,8 @@
 
       regs.forEach(r => {
         const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
+        const safeTitle = escapeHtml(ev.title);
+        const safeEntryCode = escapeHtml(r.entryCode || 'N/A');
         const tag = r.status === 'entered'
           ? '<span class="tag entered">Entered</span>'
           : '<span class="tag not-entered">Not Entered</span>';
@@ -915,9 +932,9 @@
         div.innerHTML = `
           <div class="flex-between">
             <div>
-              <div style="font-weight:600;">${ev.title} ${tag}</div>
+              <div style="font-weight:600;">${safeTitle} ${tag}</div>
               <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
-              <div class="note"><b>Entry Code:</b> ${r.entryCode || 'N/A'}</div>
+              <div class="note"><b>Entry Code:</b> ${safeEntryCode}</div>
               <div class="note">Show this code to the admin at the entry gate.</div>
             </div>
           </div>
@@ -1017,18 +1034,24 @@
       events.forEach(ev => {
         const div = document.createElement('div');
         div.className = 'event-card';
+        const safeTitle = escapeHtml(ev.title);
+        const safeMeta = [ev.date || '', ev.time || '', ev.venue || '']
+          .filter(Boolean)
+          .map(escapeHtml)
+          .join(' • ');
+        const safeDesc = escapeHtml(ev.desc || '');
         div.innerHTML = `
           <div class="flex-between">
             <div>
-              <div style="font-weight:600;">${ev.title}</div>
-              <div class="note">${ev.date || ''} ${ev.time ? '• ' + ev.time : ''} ${ev.venue ? '• ' + ev.venue : ''}</div>
+              <div style="font-weight:600;">${safeTitle}</div>
+              <div class="note">${safeMeta}</div>
             </div>
             <div class="row">
               <button class="btn secondary" style="padding:4px 10px;font-size:11px;" data-edit="${ev.id}">Edit</button>
               <button class="btn" style="padding:4px 10px;font-size:11px;" data-del="${ev.id}">Delete</button>
             </div>
           </div>
-          <div class="note" style="margin-top:6px;">${ev.desc || ''}</div>
+          <div class="note" style="margin-top:6px;">${safeDesc}</div>
         `;
         wrap.appendChild(div);
       });
@@ -1113,6 +1136,11 @@
       const events = getEvents();
       const stu = students.find(s => s.email === r.studentEmail) || { name: r.studentEmail, roll: r.roll || 'NA' };
       const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
+      const safeName = escapeHtml(stu.name);
+      const safeRoll = escapeHtml(stu.roll);
+      const safeEmail = escapeHtml(stu.email);
+      const safeEventTitle = escapeHtml(ev.title);
+      const safeEntryCode = escapeHtml(r.entryCode || 'N/A');
 
       const tag = r.status === 'entered'
         ? '<span class="tag entered">Already Entered</span>'
@@ -1122,11 +1150,11 @@
         <div class="reg-card">
           <div class="flex-between">
             <div>
-              <div style="font-weight:600;">${stu.name} (${stu.roll}) ${tag}</div>
-              <div class="note">${stu.email}</div>
-              <div class="note">Event: ${ev.title}</div>
+              <div style="font-weight:600;">${safeName} (${safeRoll}) ${tag}</div>
+              <div class="note">${safeEmail}</div>
+              <div class="note">Event: ${safeEventTitle}</div>
               <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
-              <div class="note"><b>Entry Code:</b> ${r.entryCode}</div>
+              <div class="note"><b>Entry Code:</b> ${safeEntryCode}</div>
             </div>
           </div>
           <div class="field-group" style="margin-top:8px;">
@@ -1242,8 +1270,9 @@
 
       Object.values(eventStats).forEach(st => {
         const tr = document.createElement('tr');
+        const safeTitle = escapeHtml(st.title);
         tr.innerHTML = `
-          <td>${st.title}</td>
+          <td>${safeTitle}</td>
           <td>${st.reg}</td>
           <td>${st.ent}</td>
         `;
@@ -1256,17 +1285,22 @@
         const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
         const card = document.createElement('div');
         card.className = 'reg-card';
+        const safeName = escapeHtml(stu.name);
+        const safeRoll = escapeHtml(stu.roll);
+        const safeEmail = escapeHtml(stu.email);
+        const safeEventTitle = escapeHtml(ev.title);
+        const safeEntryCode = escapeHtml(r.entryCode || 'N/A');
         const tag = r.status === 'entered'
           ? '<span class="tag entered">Entered</span>'
           : '<span class="tag not-entered">Not Entered</span>';
         card.innerHTML = `
           <div class="flex-between">
             <div>
-              <div style="font-weight:600;">${stu.name} (${stu.roll}) ${tag}</div>
-              <div class="note">${stu.email}</div>
-              <div class="note">Event: ${ev.title}</div>
+              <div style="font-weight:600;">${safeName} (${safeRoll}) ${tag}</div>
+              <div class="note">${safeEmail}</div>
+              <div class="note">Event: ${safeEventTitle}</div>
               <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
-              <div class="note"><b>Entry Code:</b> ${r.entryCode || 'N/A'}</div>
+              <div class="note"><b>Entry Code:</b> ${safeEntryCode}</div>
             </div>
           </div>
         `;
