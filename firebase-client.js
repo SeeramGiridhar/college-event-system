@@ -122,23 +122,28 @@ async function authSignIn({ email, password }) {
 // Google OAuth removed (Firebase uses popup/redirect; kept as no-op with message)
 async function authSignInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ hd: 'stpetershyd.com' });
+  provider.setCustomParameters({ prompt: 'select_account' });
   try {
     const result = await _auth.signInWithPopup(provider);
     const user   = result.user;
     // Create user doc if first time
     const snap = await _db.collection('users').doc(user.uid).get();
     if (!snap.exists) {
+      const isMaster = (user.email && user.email.toLowerCase() === 'seeramgiridhar22@gmail.com');
       await _db.collection('users').doc(user.uid).set({
-        name: user.displayName || '',
-        rollNumber: '',
+        name: user.displayName || (isMaster ? 'Giridhar (Admin)' : 'Student'),
+        rollNumber: isMaster ? 'ADMIN' : '',
         email: user.email,
-        role: 'student',
+        role: isMaster ? 'admin' : 'student',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      }).catch(() => {});
     }
     return result;
   } catch (err) {
+    if (err.code === 'auth/popup-closed-by-user') {
+      console.warn('Google sign-in popup closed by user.');
+      return null;
+    }
     throw err;
   }
 }
