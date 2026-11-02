@@ -90,6 +90,8 @@ function switchWindow(windowName) {
   const studentBtn = document.getElementById('tabStudentBtn');
   const adminBtn = document.getElementById('tabAdminBtn');
   const headerSub = document.getElementById('headerSub');
+  const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  const activePortal = sessionStorage.getItem('cem_active_portal');
 
   if (windowName === 'student') {
     studentWin.classList.remove('hidden');
@@ -97,12 +99,24 @@ function switchWindow(windowName) {
     studentBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-blue-600 text-white shadow-md';
     adminBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 text-slate-300 hover:text-white';
     headerSub.textContent = 'Student portal & event registrations';
+
+    if (currentUser && activePortal === 'student') {
+      switchStudentSub('dashboard');
+    } else {
+      switchStudentSub('login');
+    }
   } else {
     studentWin.classList.add('hidden');
     adminWin.classList.remove('hidden');
     adminBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-amber-500 text-white shadow-md';
     studentBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 text-slate-300 hover:text-white';
     headerSub.textContent = 'Admin management & ticket verification gateway';
+
+    if (currentUser && activePortal === 'admin') {
+      toggleAdminDashboardView(true);
+    } else {
+      toggleAdminDashboardView(false);
+    }
   }
 }
 
@@ -116,9 +130,11 @@ function switchStudentSub(subName) {
   const statusText = document.getElementById('studentStatusText');
 
   const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  const activePortal = sessionStorage.getItem('cem_active_portal');
+  const isStudentActive = currentUser && activePortal === 'student';
 
-  // Protect dashboard: never show unless actively authenticated
-  if (!currentUser && subName === 'dashboard') {
+  // Strict isolation: student dashboard is only accessible if active in student portal
+  if (!isStudentActive && subName === 'dashboard') {
     subName = 'login';
   }
 
@@ -130,14 +146,14 @@ function switchStudentSub(subName) {
   btnLogin.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all text-slate-600 hover:text-slate-900';
   btnDash.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all text-slate-600 hover:text-slate-900';
 
-  if (!currentUser) {
-    // Logged out: show Register & Login tabs, keep Dashboard tab hidden
+  if (!isStudentActive) {
+    // Logged out or in Admin mode: show Register & Login tabs, keep Dashboard hidden
     btnDash.classList.add('hidden');
     btnReg.classList.remove('hidden');
     btnLogin.classList.remove('hidden');
     if (statusText) statusText.innerHTML = 'Register or login with your email address.';
   } else {
-    // Logged in: show Dashboard tab only, hide Register & Login
+    // Student session active: show Dashboard tab only
     btnDash.classList.remove('hidden');
     btnReg.classList.add('hidden');
     btnLogin.classList.add('hidden');
@@ -160,7 +176,11 @@ function switchStudentSub(subName) {
 function toggleAdminDashboardView(isLoggedIn) {
   const loginCard = document.getElementById('adminLoginCard');
   const dashboardContent = document.getElementById('adminDashboardContent');
-  if (isLoggedIn) {
+  const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  const activePortal = sessionStorage.getItem('cem_active_portal');
+  const isAdminActive = isLoggedIn && currentUser && activePortal === 'admin';
+
+  if (isAdminActive) {
     loginCard.classList.add('hidden');
     dashboardContent.classList.remove('hidden');
     renderAdminDashboard();
@@ -242,6 +262,8 @@ async function handleStudentLogin() {
 
   try {
     await authSignIn({ email, password: pass });
+    sessionStorage.setItem('cem_active_portal', 'student');
+    toggleAdminDashboardView(false);
     loginMsg.textContent = 'Login successful!';
     loginMsg.className = 'text-xs font-medium text-emerald-600';
     clearStudentLogin();
@@ -274,10 +296,14 @@ function clearStudentLogin() {
 
 async function handleGoogleSignIn() {
   try {
+    sessionStorage.setItem('cem_active_portal', 'student');
+    toggleAdminDashboardView(false);
     await authSignInWithGoogle();
     const profile = await getMyProfile();
     if (!profile || !profile.roll_number || !profile.roll_number.trim()) {
       openCompleteProfileModal();
+    } else {
+      switchStudentSub('dashboard');
     }
   } catch (err) {
     console.error('Google Sign-In Error:', err);
@@ -286,8 +312,10 @@ async function handleGoogleSignIn() {
 }
 
 async function handleStudentLogout() {
+  sessionStorage.removeItem('cem_active_portal');
   await authSignOut();
   switchStudentSub('login');
+  toggleAdminDashboardView(false);
 }
 
 // Profile Completion Modal (for Google OAuth users without roll number)
@@ -452,6 +480,8 @@ async function handleAdminLogin() {
       return;
     }
 
+    sessionStorage.setItem('cem_active_portal', 'admin');
+    switchStudentSub('login');
     loginMsg.textContent = 'Admin access granted!';
     loginMsg.className = 'text-xs font-medium text-emerald-600';
     setTimeout(() => toggleAdminDashboardView(true), 400);
@@ -486,6 +516,8 @@ async function handleAdminGoogleSignIn() {
       return;
     }
 
+    sessionStorage.setItem('cem_active_portal', 'admin');
+    switchStudentSub('login');
     loginMsg.textContent = 'Admin access granted!';
     loginMsg.className = 'text-xs font-medium text-emerald-600';
     setTimeout(() => toggleAdminDashboardView(true), 400);
@@ -503,8 +535,10 @@ function clearAdminLogin() {
 }
 
 async function handleAdminLogout() {
+  sessionStorage.removeItem('cem_active_portal');
   await authSignOut();
   toggleAdminDashboardView(false);
+  switchStudentSub('login');
 }
 
 // ============================================================================
@@ -1218,18 +1252,19 @@ async function renderAdminAllRegistrationsList() {
 
       const role = profile?.role || 'student';
 
-      if (role === 'admin') {
-        // Show admin dashboard if currently on admin tab
+      let activePortal = sessionStorage.getItem('cem_active_portal');
+      if (!activePortal) {
         const adminWin = document.getElementById('adminWindow');
-        if (adminWin && !adminWin.classList.contains('hidden')) {
-          toggleAdminDashboardView(true);
-        }
-        // Show Dashboard tab
-        document.getElementById('subBtnDashboard').classList.remove('hidden');
+        const isAdminVisible = adminWin && !adminWin.classList.contains('hidden');
+        activePortal = (isAdminVisible && role === 'admin') ? 'admin' : 'student';
+        sessionStorage.setItem('cem_active_portal', activePortal);
+      }
+
+      if (activePortal === 'admin' && role === 'admin') {
+        toggleAdminDashboardView(true);
+        switchStudentSub('login');
       } else {
-        // Student: ensure admin view is locked
         toggleAdminDashboardView(false);
-        document.getElementById('subBtnDashboard').classList.remove('hidden');
         switchStudentSub('dashboard');
       }
 

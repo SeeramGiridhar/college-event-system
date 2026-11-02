@@ -159,6 +159,7 @@ async function authSignOut() {
   eventLRUCache.invalidate();
   localStorage.removeItem('cem_currentStudent');
   localStorage.removeItem('cem_currentAdmin');
+  sessionStorage.removeItem('cem_active_portal');
   await _auth.signOut();
 }
 
