@@ -421,6 +421,9 @@ function setupRealtime({ onEventsChange, onRegsChange }) {
       if (typeof onEventsChange === 'function') onEventsChange();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => {
+      // Invalidate events cache and refresh seat counts because registration changed
+      eventLRUCache.invalidate();
+      if (typeof onEventsChange === 'function') onEventsChange();
       if (typeof onRegsChange === 'function') onRegsChange();
     })
     .subscribe();

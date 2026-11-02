@@ -1,0 +1,293 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase Auth UID)
+    // Fields:
+    //   - name: string (required, 1-100 chars) - user's full name
+    //   - rollNumber: string (optional, 0-50 chars) - student roll/ID number
+    //   - email: string (required, valid email format, 1-120 chars) - user email address
+    //   - role: string (required, 'student' | 'admin') - authorization role
+    //   - createdAt: timestamp (optional) - account creation timestamp
+    //
+    // Collection: events
+    // Document ID: {eventId} (Auto-generated Firestore document ID)
+    // Fields:
+    //   - title: string (required, 1-200 chars) - event title
+    //   - date: string (required, 1-30 chars) - event date (e.g. YYYY-MM-DD)
+    //   - time: string | null (optional, 0-30 chars) - event start time
+    //   - venue: string (optional, 0-200 chars) - event venue / hall
+    //   - description: string (optional, 0-3000 chars) - event description
+    //   - capacity: int (required, > 0 and <= 100000) - total allowed attendees
+    //   - registeredCount: int (required, >= 0 and <= capacity) - count of registered attendees
+    //   - status: string (required, enum) - 'published' | 'unpublished' | 'upcoming' | 'completed' | 'cancelled'
+    //   - category: string (optional, 0-100 chars) - event category tag
+    //   - createdAt: timestamp (optional) - creation timestamp
+    //   - createdBy: string (optional, 1-100 chars) - UID of event creator
+    //
+    // Collection: registrations
+    // Document ID: {regId} (${eventId}_${uid})
+    // Fields:
+    //   - eventId: string (required, 1-100 chars) - referenced event ID
+    //   - uid: string (required, 1-100 chars) - student's Firebase Auth UID
+    //   - studentName: string (optional, 0-100 chars) - student full name
+    //   - studentEmail: string (optional, 0-120 chars) - student email address
+    //   - rollNumber: string (optional, 0-50 chars) - student roll/ID number
+    //   - entryCode: string (required, 1-50 chars) - unique check-in code
+    //   - entered: bool (required) - check-in status (false on create)
+    //   - enteredAt: timestamp | null (optional) - check-in timestamp
+    //   - registeredAt: timestamp (optional) - registration timestamp
+    //
+    // Collection: entry_codes
+    // Document ID: {code} (Unique Entry Code string)
+    // Fields:
+    //   - regId: string (required, 1-100 chars) - referenced registration document ID
+    //   - eventId: string (required, 1-100 chars) - referenced event ID
+    //   - uid: string (required, 1-100 chars) - student's Firebase Auth UID
+    //   - code: string (optional, 1-50 chars) - entry code matching document ID
+    //   - createdAt: timestamp (optional) - creation timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns the resource by matching user ID
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Verify bootstrap/master admin account
+    function isMasterAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'seeramgiridhar22@gmail.com';
+    }
+
+    // Safely check if current user document exists before attempting get()
+    function hasUserDoc() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Retrieve user data for the current user
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Check if user has admin privileges
+    function isAdmin() {
+      return isAuthenticated() && (
+        isMasterAdmin() ||
+        (hasUserDoc() && getUserData().role == 'admin')
+      );
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // Validate User document schema and constraints
+    function isValidUser(data) {
+      return data.keys().hasOnly(['name', 'rollNumber', 'email', 'role', 'createdAt']) &&
+        data.keys().hasAll(['name', 'email', 'role']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.email is string && isValidEmail(data.email) && data.email.size() <= 120 &&
+        data.role in ['student', 'admin'] &&
+        (!('rollNumber' in data) || (data.rollNumber is string && data.rollNumber.size() <= 50)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    // Validate Event document schema and constraints
+    function isValidEvent(data) {
+      return data.keys().hasOnly(['title', 'date', 'time', 'venue', 'description', 'capacity', 'registeredCount', 'status', 'category', 'createdAt', 'createdBy']) &&
+        data.keys().hasAll(['title', 'date', 'capacity', 'registeredCount', 'status']) &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.date is string && data.date.size() > 0 && data.date.size() <= 30 &&
+        (!('time' in data) || data.time == null || (data.time is string && data.time.size() <= 30)) &&
+        (!('venue' in data) || (data.venue is string && data.venue.size() <= 200)) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 3000)) &&
+        data.capacity is int && data.capacity > 0 && data.capacity <= 100000 &&
+        data.registeredCount is int && data.registeredCount >= 0 && data.registeredCount <= data.capacity &&
+        data.status in ['published', 'unpublished', 'upcoming', 'completed', 'cancelled'] &&
+        (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 100));
+    }
+
+    // Validate non-admin student counter increment for event registration
+    function isStudentEventRegistrationUpdate() {
+      return isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredCount']) &&
+        request.resource.data.registeredCount == resource.data.registeredCount + 1 &&
+        request.resource.data.registeredCount <= resource.data.capacity;
+    }
+
+    // Validate Registration document schema and constraints
+    function isValidRegistration(data) {
+      return data.keys().hasOnly(['eventId', 'uid', 'studentName', 'studentEmail', 'rollNumber', 'entryCode', 'entered', 'enteredAt', 'registeredAt']) &&
+        data.keys().hasAll(['eventId', 'uid', 'entryCode', 'entered']) &&
+        data.eventId is string && data.eventId.size() > 0 && data.eventId.size() <= 100 &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 100 &&
+        (!('studentName' in data) || (data.studentName is string && data.studentName.size() <= 100)) &&
+        (!('studentEmail' in data) || (data.studentEmail is string && data.studentEmail.size() <= 120 && (data.studentEmail.size() == 0 || isValidEmail(data.studentEmail)))) &&
+        (!('rollNumber' in data) || (data.rollNumber is string && data.rollNumber.size() <= 50)) &&
+        data.entryCode is string && data.entryCode.size() > 0 && data.entryCode.size() <= 50 &&
+        data.entered is bool &&
+        (!('enteredAt' in data) || data.enteredAt == null || data.enteredAt is timestamp) &&
+        (!('registeredAt' in data) || data.registeredAt is timestamp);
+    }
+
+    // Validate Entry Code document schema and constraints
+    function isValidEntryCode(data) {
+      return data.keys().hasOnly(['code', 'regId', 'eventId', 'uid', 'createdAt']) &&
+        data.keys().hasAll(['regId', 'eventId', 'uid']) &&
+        data.regId is string && data.regId.size() > 0 && data.regId.size() <= 100 &&
+        data.eventId is string && data.eventId.size() > 0 && data.eventId.size() <= 100 &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 100 &&
+        (!('code' in data) || (data.code is string && data.code.size() > 0 && data.code.size() <= 50)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    // ===============================================================
+    // Root Level Access: Default Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Collection: users
+    // ===============================================================
+    match /users/{userId} {
+      // Authenticated users can read their own profile; Admins can read all profiles
+      allow read: if isOwner(userId) || isAdmin();
+
+      // On creation by authenticated user, role cannot be set to 'admin' (only 'student' or if master admin)
+      // Admins can also create user documents
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && (
+          request.resource.data.role == 'student' ||
+          isMasterAdmin()
+        )) ||
+        isAdmin()
+      );
+
+      // On update by user, only name and rollNumber may be modified; role and email are immutable
+      // Admins can update any user document
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'rollNumber'])) ||
+        isAdmin()
+      );
+
+      // Only admins can delete user documents
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Collection: events
+    // ===============================================================
+    match /events/{eventId} {
+      // Authenticated users can read events
+      allow read: if isAuthenticated();
+
+      // Only admins can create events
+      allow create: if isAdmin() && isValidEvent(request.resource.data);
+
+      // Admins can update all event fields; Non-admins can ONLY increment registeredCount by 1 within capacity
+      allow update: if isValidEvent(request.resource.data) && (
+        isStudentEventRegistrationUpdate() ||
+        isAdmin()
+      );
+
+      // Only admins can delete events
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Collection: registrations
+    // ===============================================================
+    match /registrations/{regId} {
+      // Users can read their own registrations; Admins can read all registrations
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.uid ||
+        isAdmin()
+      );
+
+      // Student registration creation:
+      // - Document ID must be {eventId}_{uid}
+      // - uid field must match authenticated user
+      // - entered must be false
+      // - User document must exist in users collection
+      // Admins can also create registrations
+      allow create: if isValidRegistration(request.resource.data) && (
+        (
+          isAuthenticated() &&
+          regId == request.resource.data.eventId + '_' + request.auth.uid &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.entered == false &&
+          hasUserDoc()
+        ) ||
+        isAdmin()
+      );
+
+      // Only admins can update registrations (e.g. mark entered: true, enteredAt: timestamp)
+      // Non-admins cannot update registrations. Immutable fields must be preserved.
+      allow update: if isAdmin() &&
+        isValidRegistration(request.resource.data) &&
+        request.resource.data.eventId == resource.data.eventId &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.entryCode == resource.data.entryCode;
+
+      // Only admins can delete registrations
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Collection: entry_codes
+    // ===============================================================
+    match /entry_codes/{code} {
+      // Authenticated users can read entry codes
+      allow read: if isAuthenticated();
+
+      // Authenticated users can create an entry code document ONLY if it does not already exist
+      // and fields contain valid references (regId, eventId, uid == request.auth.uid)
+      // Admins can also create entry codes
+      allow create: if isValidEntryCode(request.resource.data) &&
+        !exists(/databases/$(database)/documents/entry_codes/$(code)) && (
+          (
+            isAuthenticated() &&
+            request.resource.data.uid == request.auth.uid &&
+            request.resource.data.regId == request.resource.data.eventId + '_' + request.auth.uid &&
+            (!('code' in request.resource.data) || request.resource.data.code == code)
+          ) ||
+          isAdmin()
+        );
+
+      // Entry codes are immutable once created
+      allow update: if false;
+
+      // Only admins can delete entry code documents (e.g. when an event is deleted)
+      allow delete: if isAdmin();
+    }
+
+  }
+}

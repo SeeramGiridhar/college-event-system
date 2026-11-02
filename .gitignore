@@ -1,4 +1,4 @@
-﻿# Environment variables — never commit real secrets
+# Environment variables — never commit real secrets
 .env
 .env.*
 !.env.example
@@ -13,3 +13,5 @@ build/
 *.local
 .DS_Store
 Thumbs.db
+scratch/
+

@@ -73,9 +73,16 @@ function escapeHtml(v) {
                         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// ─── Helper: generate 8-char uppercase entry code ────────────────────────────
+// ─── Helper: generate 8-char uppercase entry code (crypto-safe) ──────────────
+const _CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function _genCode() {
-  return Math.random().toString(36).substring(2, 10).toUpperCase().padEnd(8,'X').substring(0,8);
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += _CODE_CHARS[bytes[i] % _CODE_CHARS.length];
+  }
+  return code;
 }
 
 // ─── Compatibility shim: isSupabaseConfigured → isFirebaseConfigured ──────────
@@ -89,13 +96,12 @@ async function authSignUp({ email, password, fullName, rollNumber }) {
   try {
     const cred = await _auth.createUserWithEmailAndPassword(e, password);
     const uid  = cred.user.uid;
-    // Write user doc — role always "student" on signup; admin set manually
-    const role = (e === 'seeramgiridhar22@gmail.com') ? 'admin' : 'student';
+    // Write user doc — role is always "student" on client signup; admin role is derived only from Firestore
     await _db.collection('users').doc(uid).set({
-      name: fullName.trim() || 'Admin',
-      rollNumber: rollNumber.trim().toUpperCase() || 'ADMIN',
+      name: fullName.trim() || 'Student',
+      rollNumber: rollNumber.trim().toUpperCase() || '',
       email: e,
-      role: role,
+      role: 'student',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     return { session: cred };          // keep return shape app.js expects
@@ -119,7 +125,7 @@ async function authSignIn({ email, password }) {
   }
 }
 
-// Google OAuth removed (Firebase uses popup/redirect; kept as no-op with message)
+// Google OAuth
 async function authSignInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
@@ -129,12 +135,11 @@ async function authSignInWithGoogle() {
     // Create user doc if first time
     const snap = await _db.collection('users').doc(user.uid).get();
     if (!snap.exists) {
-      const isMaster = (user.email && user.email.toLowerCase() === 'seeramgiridhar22@gmail.com');
       await _db.collection('users').doc(user.uid).set({
-        name: user.displayName || (isMaster ? 'Giridhar (Admin)' : 'Student'),
-        rollNumber: isMaster ? 'ADMIN' : '',
+        name: user.displayName || 'Student',
+        rollNumber: '',
         email: user.email,
-        role: isMaster ? 'admin' : 'student',
+        role: 'student',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       }).catch(() => {});
     }
@@ -182,48 +187,21 @@ async function authGetUser() {
 async function getMyProfile() {
   const user = _auth.currentUser;
   if (!user) return null;
-  const isMasterAdmin = (user.email && user.email.toLowerCase() === 'seeramgiridhar22@gmail.com');
   try {
     const snap = await _db.collection('users').doc(user.uid).get();
     if (!snap.exists) {
-      if (isMasterAdmin) {
-        // Auto-create master admin doc if missing
-        _db.collection('users').doc(user.uid).set({
-          name: 'Giridhar (Admin)',
-          rollNumber: 'ADMIN',
-          email: user.email,
-          role: 'admin',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(() => {});
-        return {
-          id: user.uid,
-          full_name: 'Giridhar (Admin)',
-          roll_number: 'ADMIN',
-          role: 'admin',
-          email: user.email
-        };
-      }
       return null;
     }
     const d = snap.data();
     return {
       id: snap.id,
-      full_name: d.name || (isMasterAdmin ? 'Giridhar (Admin)' : 'Student'),
-      roll_number: d.rollNumber || (isMasterAdmin ? 'ADMIN' : ''),
-      role: isMasterAdmin ? 'admin' : (d.role || 'student'),
+      full_name: d.name || 'Student',
+      roll_number: d.rollNumber || '',
+      role: d.role || 'student',
       email: d.email || user.email
     };
   } catch (err) {
     console.warn('getMyProfile error:', err.message);
-    if (isMasterAdmin) {
-      return {
-        id: user.uid,
-        full_name: 'Giridhar (Admin)',
-        roll_number: 'ADMIN',
-        role: 'admin',
-        email: user.email
-      };
-    }
     return null;
   }
 }
@@ -361,12 +339,26 @@ async function apiUpdateEvent(id, fields) {
 async function apiDeleteEvent(id) {
   eventLRUCache.invalidate(id);
   seatCounterMap.delete(String(id));
-  // Delete all registrations for this event first
+
+  // Delete all registrations and their entry codes in chunks <= 200 operations (within Firestore's 500 limit)
   const regSnap = await _db.collection('registrations').where('eventId', '==', id).get();
-  const batch = _db.batch();
-  regSnap.forEach(d => batch.delete(d.ref));
-  batch.delete(_db.collection('events').doc(id));
-  await batch.commit();
+  const docs = regSnap.docs;
+  const CHUNK_SIZE = 200;
+  for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+    const batch = _db.batch();
+    const chunk = docs.slice(i, i + CHUNK_SIZE);
+    chunk.forEach(d => {
+      batch.delete(d.ref);
+      const code = d.data().entryCode;
+      if (code) {
+        batch.delete(_db.collection('entry_codes').doc(code));
+      }
+    });
+    await batch.commit();
+  }
+
+  // Delete the event document only after all registration batches have committed
+  await _db.collection('events').doc(id).delete();
 }
 
 // ─── REGISTRATIONS ────────────────────────────────────────────────────────────
@@ -382,41 +374,70 @@ async function apiRegisterForEvent(eventId) {
   const regRef = _db.collection('registrations').doc(docId);
   const evRef  = _db.collection('events').doc(eventId);
 
-  const entryCode = _genCode();
+  const profile = await getMyProfile();
+  let assignedCode = null;
 
-  // Atomic transaction: check capacity, prevent duplicate, decrement seat
-  await _db.runTransaction(async tx => {
-    const evDoc  = await tx.get(evRef);
-    const regDoc = await tx.get(regRef);
+  // Retry up to 5 times in case of entry code collision
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidateCode = _genCode();
+    const codeRef = _db.collection('entry_codes').doc(candidateCode);
 
-    if (!evDoc.exists) throw new Error('Event not found.');
-    if (regDoc.exists) throw new Error('ALREADY_REGISTERED');
+    try {
+      await _db.runTransaction(async tx => {
+        const evDoc   = await tx.get(evRef);
+        const regDoc  = await tx.get(regRef);
+        const codeDoc = await tx.get(codeRef);
 
-    const { capacity, registeredCount = 0 } = evDoc.data();
-    if (registeredCount >= capacity) throw new Error('EVENT_FULL');
+        if (!evDoc.exists) throw new Error('Event not found.');
+        if (regDoc.exists) throw new Error('ALREADY_REGISTERED');
+        if (codeDoc.exists) throw new Error('CODE_COLLISION');
 
-    const profile = await getMyProfile();
-    tx.set(regRef, {
-      eventId,
-      uid:          user.uid,
-      studentName:  profile?.full_name || '',
-      studentEmail: user.email,
-      rollNumber:   profile?.roll_number || '',
-      entryCode,
-      entered:      false,
-      enteredAt:    null,
-      registeredAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    tx.update(evRef, {
-      registeredCount: firebase.firestore.FieldValue.increment(1)
-    });
-  });
+        const { capacity, registeredCount = 0 } = evDoc.data();
+        if (registeredCount >= capacity) throw new Error('EVENT_FULL');
+
+        tx.set(regRef, {
+          eventId,
+          uid:          user.uid,
+          studentName:  profile?.full_name || '',
+          studentEmail: user.email,
+          rollNumber:   profile?.roll_number || '',
+          entryCode:    candidateCode,
+          entered:      false,
+          enteredAt:    null,
+          registeredAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        tx.set(codeRef, {
+          regId:     docId,
+          eventId,
+          uid:       user.uid,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        tx.update(evRef, {
+          registeredCount: firebase.firestore.FieldValue.increment(1)
+        });
+      });
+
+      assignedCode = candidateCode;
+      break;
+    } catch (txErr) {
+      if (txErr.message === 'CODE_COLLISION') {
+        continue;
+      }
+      throw txErr;
+    }
+  }
+
+  if (!assignedCode) {
+    throw new Error('Failed to generate a unique entry code. Please try again.');
+  }
 
   registeredSet.add(eventId);
   eventLRUCache.invalidate(eventId);
   const cs = getSeatCounter(eventId);
   if (cs) updateSeatCounter(eventId, cs.registered + 1, cs.capacity);
-  return entryCode;
+  return assignedCode;
 }
 
 async function apiGetMyRegistrations() {
@@ -469,21 +490,36 @@ async function apiVerifyEntry(code) {
   };
 }
 
-// Admin: mark attendee as entered (atomic)
+// Admin: mark attendee as entered (atomic in Firestore transaction)
 async function apiMarkEntered(code) {
   const snap = await _db.collection('registrations')
     .where('entryCode', '==', code.trim().toUpperCase())
     .limit(1)
     .get();
   if (snap.empty) return { ok: false, error: 'INVALID_CODE' };
-  const doc = snap.docs[0];
-  if (doc.data().entered) return { ok: false, error: 'ALREADY_ENTERED' };
-  await doc.ref.update({
-    entered:   true,
-    enteredAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  eventLRUCache.invalidate();
-  return { ok: true };
+  const regRef = snap.docs[0].ref;
+
+  try {
+    await _db.runTransaction(async tx => {
+      const regDoc = await tx.get(regRef);
+      if (!regDoc.exists) {
+        throw new Error('INVALID_CODE');
+      }
+      if (regDoc.data().entered) {
+        throw new Error('ALREADY_ENTERED');
+      }
+      tx.update(regRef, {
+        entered:   true,
+        enteredAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    eventLRUCache.invalidate();
+    return { ok: true };
+  } catch (err) {
+    if (err.message === 'INVALID_CODE') return { ok: false, error: 'INVALID_CODE' };
+    if (err.message === 'ALREADY_ENTERED') return { ok: false, error: 'ALREADY_ENTERED' };
+    throw err;
+  }
 }
 
 // Admin: get all registrations for one event (for CSV export)

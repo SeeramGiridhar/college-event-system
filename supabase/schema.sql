@@ -84,14 +84,26 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, roll_number, role)
-  VALUES (
-    NEW.id,
-    COALESCE(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
-    NULLIF(UPPER(TRIM(COALESCE(NEW.raw_user_meta_data->>'roll_number', ''))), ''),
-    'student'
-  )
-  ON CONFLICT (id) DO NOTHING;
+  BEGIN
+    INSERT INTO public.profiles (id, full_name, roll_number, role)
+    VALUES (
+      NEW.id,
+      COALESCE(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+      NULLIF(UPPER(TRIM(COALESCE(NEW.raw_user_meta_data->>'roll_number', ''))), ''),
+      'student'
+    )
+    ON CONFLICT (id) DO NOTHING;
+  EXCEPTION
+    WHEN unique_violation THEN
+      INSERT INTO public.profiles (id, full_name, roll_number, role)
+      VALUES (
+        NEW.id,
+        COALESCE(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+        NULL,
+        'student'
+      )
+      ON CONFLICT (id) DO NOTHING;
+  END;
   RETURN NEW;
 END;
 $$;
@@ -121,7 +133,7 @@ $$;
 
 DROP TRIGGER IF EXISTS enforce_college_email_on_insert ON auth.users;
 CREATE TRIGGER enforce_college_email_on_insert
-  BEFORE INSERT ON auth.users
+  BEFORE INSERT OR UPDATE OF email ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.enforce_college_email();
 
 -- ─────────────────────────────────────────────
@@ -134,7 +146,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  NEW.role := OLD.role;
+  -- Prevent role modification from untrusted user-JWT context, while allowing trusted SQL Editor / service-role contexts
+  IF NEW.role IS DISTINCT FROM OLD.role THEN
+    IF current_setting('request.jwt.claim.role', true) = 'authenticated' THEN
+      NEW.role := OLD.role;
+    END IF;
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -467,3 +484,10 @@ $$;
 -- WHERE id = (SELECT id FROM auth.users WHERE email = 'YOUR_EMAIL@stpetershyd.com');
 --
 -- =============================================================
+
+
+-- ─────────────────────────────────────────────
+-- REALTIME PUBLICATION
+-- ─────────────────────────────────────────────
+ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.registrations;

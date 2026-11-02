@@ -275,6 +275,10 @@ function clearStudentLogin() {
 async function handleGoogleSignIn() {
   try {
     await authSignInWithGoogle();
+    const profile = await getMyProfile();
+    if (!profile || !profile.roll_number || !profile.roll_number.trim()) {
+      openCompleteProfileModal();
+    }
   } catch (err) {
     console.error('Google Sign-In Error:', err);
     showModal('Google Sign-In Failed', err.message || 'Could not initiate Google sign in.', 'error');
@@ -437,31 +441,11 @@ async function handleAdminLogin() {
   if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Verifying...'; }
 
   try {
-    try {
-      await authSignIn({ email, password: pass });
-    } catch (signInErr) {
-      console.warn('Initial admin sign in error:', signInErr);
-      if (email === 'seeramgiridhar22@gmail.com') {
-        try {
-          loginMsg.textContent = 'Provisioning master admin...';
-          await authSignUp({ email, password: pass, fullName: 'Giridhar (Admin)', rollNumber: 'ADMIN' });
-        } catch (signUpErr) {
-          console.warn('Admin sign up fallback error:', signUpErr);
-          if (signUpErr.message && (signUpErr.message.includes('already') || signUpErr.message.includes('user_already_exists'))) {
-            throw new Error('Incorrect password. If you registered via Google, click "Continue with Google" below.');
-          }
-          throw signUpErr;
-        }
-      } else {
-        throw signInErr;
-      }
-    }
+    await authSignIn({ email, password: pass });
 
-    const user = firebase.auth().currentUser;
-    const isMaster = (user && user.email && user.email.toLowerCase() === 'seeramgiridhar22@gmail.com');
     const profile = await getMyProfile();
 
-    if (!isMaster && (!profile || profile.role !== 'admin')) {
+    if (!profile || profile.role !== 'admin') {
       await authSignOut();
       loginMsg.textContent = 'This account does not have administrator privileges.';
       loginMsg.className = 'text-xs font-medium text-rose-600';
@@ -493,12 +477,11 @@ async function handleAdminGoogleSignIn() {
     const user = (result && result.user) ? result.user : firebase.auth().currentUser;
     if (!user) throw new Error('No user returned from Google sign in.');
 
-    const isMaster = (user.email && user.email.toLowerCase() === 'seeramgiridhar22@gmail.com');
     const profile = await getMyProfile();
 
-    if (!isMaster && (!profile || profile.role !== 'admin')) {
+    if (!profile || profile.role !== 'admin') {
       await authSignOut();
-      loginMsg.textContent = 'Google account ' + user.email + ' is not an admin.';
+      loginMsg.textContent = 'Google account ' + (user.email || '') + ' does not have administrator privileges.';
       loginMsg.className = 'text-xs font-medium text-rose-600';
       return;
     }
@@ -761,7 +744,7 @@ async function renderAdminEventsList() {
           </div>
         </div>
         <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-          <button onclick="exportEventCsv('${ev.id}', '${escapeHtml(ev.title)}')" class="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
+          <button type="button" class="btn-export-csv text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
             📥 Export CSV
           </button>
           <div class="flex items-center gap-1.5">
@@ -774,6 +757,10 @@ async function renderAdminEventsList() {
           </div>
         </div>
       `;
+      const exportBtn = card.querySelector('.btn-export-csv');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', () => exportEventCsv(ev.id, ev.title));
+      }
       container.appendChild(card);
     });
   } catch (err) {
