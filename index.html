@@ -1,1328 +1,829 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
+
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>College Event Management System</title>
 
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet" />
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Chart.js for stats pie chart -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Pinned CDN Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Firebase 9 compat (same API as v8, works with plain CDN, no bundler) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <style>
-    :root {
-      --primary: #1d4ed8;
-      --primary-dark: #1e3a8a;
-      --accent: #22c55e;
-      --warn: #f97316;
-      --danger: #b91c1c;
-      --bg-soft: #f4f6fc;
-      --card: #ffffff;
-      --muted: #6b7280;
-      --border: #d4d7f5;
-    }
-
-    * { box-sizing: border-box; }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #e0e7ff 0, #f9fafb 55%, #f3f4f6 100%);
-      color: #111827;
-    }
-
     body {
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      font-family: 'Inter', sans-serif;
     }
 
-    .app-shell {
-      width: 100%;
-      max-width: 1220px;
-      margin: 20px;
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
     }
 
-    header.app-header {
-      background: linear-gradient(120deg, #020617, #0f172a, #111827);
-      color: #f9fafb;
-      padding: 14px 18px;
-      border-radius: 16px;
-      box-shadow: 0 14px 45px rgba(15, 23, 42, 0.55);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 8px;
     }
 
-    .app-brand { display: flex; flex-direction: column; gap: 2px; }
-    .app-title { font-size: 20px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-    .app-sub { font-size: 12px; color: #9ca3af; }
-
-    .right-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-
-    .clock {
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      font-size: 11px;
-      color: #e5e7eb;
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 8px;
     }
 
-    .top-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-
-    .top-tab-btn {
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      background: rgba(15, 23, 42, 0.5);
-      color: #e5e7eb;
-      padding: 7px 12px;
-      font-size: 11px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: background 0.15s, transform 0.08s, box-shadow 0.12s;
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
     }
-
-    .top-tab-btn span.icon { font-size: 14px; }
-
-    .top-tab-btn.active {
-      background: var(--primary);
-      color: #f9fafb;
-      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.7);
-    }
-
-    .top-tab-btn:hover { transform: translateY(-1px); }
-
-    main { margin-top: 18px; }
-
-    .window { display: none; animation: fadeIn 0.22s ease-out; }
-    .window.active { display: block; }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
-
-    .card {
-      background: #ffffff;
-      border-radius: 14px;
-      padding: 16px 16px 18px;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    .animate-fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
     }
 
-    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-
-    .card-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-
-    .dot { width: 9px; height: 9px; border-radius: 999px; background: var(--primary); }
-
-    .card-sub { font-size: 12px; color: var(--muted); }
-
-    .field-group { margin-top: 10px; }
-
-    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-
-    .input, select, textarea {
-      width: 100%;
-      padding: 9px 10px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #f9fbff;
-      font-size: 13px;
-      outline: none;
-      transition: border 0.15s, box-shadow 0.15s, background 0.15s;
+    @keyframes shimmer {
+      0% {
+        background-position: -200% 0;
+      }
+      100% {
+        background-position: 200% 0;
+      }
     }
 
-    .input:focus, select:focus, textarea:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-      background: #ffffff;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 9px 16px;
-      border-radius: 999px;
-      border: none;
-      font-size: 13px;
-      font-weight: 600;
-      background: var(--primary);
-      color: #f9fafb;
-      cursor: pointer;
-      gap: 6px;
-      transition: background 0.15s, transform 0.08s, box-shadow 0.12s;
-    }
-
-    .btn:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45); }
-    .btn:active { transform: translateY(0); box-shadow: none; }
-
-    .btn.secondary {
-      background: transparent;
-      color: var(--primary);
-      border: 1px solid rgba(148, 163, 184, 0.7);
-      box-shadow: none;
-    }
-
-    .btn.secondary:hover { background: rgba(37, 99, 235, 0.06); box-shadow: none; }
-
-    .btn.link { background: transparent; border: none; padding: 0; font-size: 12px; color: var(--primary); box-shadow: none; }
-    .btn.link:hover { text-decoration: underline; transform: none; box-shadow: none; }
-
-    .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
-    .note.error { color: var(--danger); }
-    .note.success { color: #047857; }
-
-    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-
-    .tab-strip { display: inline-flex; background: #e5e7eb; border-radius: 999px; padding: 3px; margin-bottom: 10px; }
-    .sub-tab-btn { border-radius: 999px; border: none; background: transparent; padding: 6px 12px; font-size: 12px; cursor: pointer; }
-    .sub-tab-btn.active { background: #ffffff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18); }
-
-    .sub-window { display: none; }
-    .sub-window.active { display: block; animation: fadeIn 0.18s ease-out; }
-
-    .tag { display: inline-flex; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-    .tag.entered { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
-    .tag.not-entered { background: rgba(249, 115, 22, 0.12); color: #ea580c; }
-
-    .event-card, .reg-card { border-radius: 12px; border: 1px solid #e5e7eb; padding: 10px 12px; margin-bottom: 10px; background: #fdfdff; }
-
-    .stat-pill { padding: 6px 10px; border-radius: 999px; background: #f9fafb; border: 1px solid #e5e7eb; font-size: 12px; }
-
-    .table-like { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-    .table-like th, .table-like td { border-bottom: 1px solid #e5e7eb; padding: 6px 4px; text-align: left; }
-    .table-like th { font-weight: 600; background: #eef2ff; }
-
-    .window-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #111827; display: flex; align-items: center; gap: 6px; }
-    .window-title span { font-size: 11px; font-weight: 400; color: var(--muted); }
-
-    @media (max-width: 640px) {
-      header.app-header { flex-direction: column; align-items: flex-start; }
-      .right-header { justify-content: flex-start; }
+    .skeleton-box {
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
     }
   </style>
 </head>
-<body>
-  <div class="app-shell">
-    <header class="app-header">
-      <div class="app-brand">
-        <div class="app-title">College Event Management System</div>
-        <div class="app-sub" id="headerSub">Student & Admin windows with live time</div>
+
+<body class="h-full bg-slate-100 text-slate-800 antialiased flex flex-col items-center justify-start overflow-x-hidden selection:bg-blue-500 selection:text-white">
+
+  <div class="w-full max-w-7xl mx-auto p-4 sm:p-6 flex flex-col min-h-screen">
+
+    <!-- Top Header -->
+    <header class="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
+      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30">
+            📅
+          </div>
+          <div>
+            <h1 class="text-lg sm:text-xl font-bold tracking-wide uppercase text-white">College Event Hub</h1>
+            <p class="text-xs text-slate-400" id="headerSub">Student portal & event registrations</p>
+          </div>
+        </div>
       </div>
-      <div class="right-header">
-        <div class="clock" id="liveClock">--:-- --, --- -- ----</div>
-        <div class="top-tabs">
-          <button class="top-tab-btn active" data-window="studentWindow"><span class="icon">👨‍🎓</span> Student Window</button>
-          <button class="top-tab-btn" data-window="adminWindow"><span class="icon">🛡️</span> Admin Window</button>
+
+      <div class="flex items-center gap-3 flex-wrap justify-end w-full md:w-auto">
+        <div id="liveClock" class="px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-300 shadow-inner">
+          --:-- --, --- -- ----
+        </div>
+
+        <div class="flex items-center bg-slate-800 p-1 rounded-full border border-slate-700">
+          <button id="tabStudentBtn" onclick="switchWindow('student')"
+            class="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-blue-600 text-white shadow-md">
+            👨‍🎓 Student Portal
+          </button>
+          <button id="tabAdminBtn" onclick="switchWindow('admin')"
+            class="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 text-slate-300 hover:text-white">
+            🛡️ Admin Portal
+          </button>
         </div>
       </div>
     </header>
 
-    <main>
-      <!-- ================= STUDENT WINDOW ================= -->
-      <section id="studentWindow" class="window active">
-        <div class="window-title">Student Window <span>Account creation & event registration</span></div>
+    <!-- Main Content Area -->
+    <main class="flex-grow mt-6 w-full">
 
-        <div class="card" style="margin-bottom:16px; background: radial-gradient(circle at top left, #e0f2fe 0, #ffffff 55%);">
-          <div class="flex-between">
+      <!-- ================= STUDENT WINDOW ================= -->
+      <section id="studentWindow" class="window animate-fade-in">
+
+        <!-- Student Auth Status & Tabs -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="w-3 h-3 rounded-full bg-blue-600 animate-pulse"></div>
             <div>
-              <div class="card-title"><span class="dot"></span>Student Portal</div>
-              <div class="card-sub">Step 1: Create account. Step 2: Login to see events.</div>
+              <h2 class="text-base font-bold text-slate-900">Student Access Center</h2>
+              <p class="text-xs text-slate-500" id="studentStatusText">Register or login with your email address.</p>
             </div>
-            <div class="tab-strip">
-              <button class="sub-tab-btn active" data-sub="studentRegisterSub">Register</button>
-              <button class="sub-tab-btn" data-sub="studentLoginSub">Login</button>
-            </div>
+          </div>
+          <div id="studentNavTabs" class="flex items-center bg-slate-100 p-1 rounded-full border border-slate-200 w-full sm:w-auto justify-center">
+            <button onclick="switchStudentSub('register')" id="subBtnRegister"
+              class="px-4 py-1.5 rounded-full text-xs font-semibold transition-all text-slate-600 hover:text-slate-900">Register</button>
+            <button onclick="switchStudentSub('login')" id="subBtnLogin"
+              class="px-4 py-1.5 rounded-full text-xs font-semibold transition-all bg-white text-slate-900 shadow-sm">Login</button>
+            <button onclick="switchStudentSub('dashboard')" id="subBtnDashboard"
+              class="px-4 py-1.5 rounded-full text-xs font-semibold transition-all text-slate-600 hover:text-slate-900 hidden">Dashboard</button>
           </div>
         </div>
 
-        <!-- Student Registration Sub-window -->
-        <div class="sub-window active" id="studentRegisterSub">
-          <div class="grid-2">
-            <div class="card" style="background: radial-gradient(circle at top, #dcfce7 0, #ffffff 55%);">
-              <div class="card-header">
+        <!-- 1. Student Registration Sub-window -->
+        <div id="subWindowRegister" class="sub-window hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Create Student Account
+                </h3>
+              </div>
+
+              <div class="space-y-4">
                 <div>
-                  <div class="card-title"><span class="dot" style="background:#22c55e;"></span>Create Student Account</div>
-                  <div class="card-sub">Only @stpetershyd.com emails are accepted.</div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
+                  <input id="regName" type="text"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    placeholder="e.g. Rahul Sharma" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
+                  <input id="regRoll" type="text"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono uppercase"
+                    placeholder="e.g. 21A91A05G1" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
+                  <input id="regEmail" type="email"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    placeholder="your@email.com" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                  <div class="relative">
+                    <input id="regPass" type="password"
+                      class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      placeholder="Minimum 6 characters" />
+                    <button type="button" onclick="togglePasswordVisibility('regPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+                  </div>
                 </div>
               </div>
-
-              <div class="field-group">
-                <label>Full Name</label>
-                <input id="regName" class="input" placeholder="Your full name" />
-              </div>
-              <div class="field-group">
-                <label>Roll Number</label>
-                <input id="regRoll" class="input" placeholder="e.g. 21A91A05G1" />
-              </div>
-              <div class="field-group">
-                <label>College Email (@stpetershyd.com)</label>
-                <input id="regEmail" class="input" placeholder="name@stpetershyd.com" />
-              </div>
-              <div class="field-group">
-                <label>Password</label>
-                <input id="regPass" type="password" class="input" placeholder="Min 6 characters" />
-              </div>
-
-              <div class="field-group">
-                <button class="btn" id="regBtn">Register as Student</button>
-                <button class="btn secondary" id="regClear">Reset</button>
-              </div>
-
-              <div id="regMsg" class="note"></div>
             </div>
 
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#0ea5e9;"></span>Why these details?</div>
-                  <div class="card-sub">Explanation for project viva.</div>
-                </div>
+            <div class="mt-6">
+              <div class="flex items-center gap-3">
+                <button onclick="handleStudentRegister()"
+                  class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/20">Register
+                  Account</button>
+                <button onclick="clearStudentRegister()"
+                  class="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-medium transition-all">Clear</button>
               </div>
-              <ul class="note" style="padding-left:18px; margin-top:4px;">
-                <li>Full name: used on certificates & reports.</li>
-                <li>Roll number: unique ID inside college.</li>
-                <li>College email: ensures only official students use the portal.</li>
-                <li>Password: used for login, stored locally in browser (demo, no backend).</li>
+
+              <!-- Google OAuth Register Option -->
+              <div class="relative my-4">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-slate-400 font-medium">Or</span></div>
+              </div>
+              <button type="button" onclick="handleGoogleSignIn()" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-sm">
+                <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                Continue with Google
+              </button>
+
+              <div id="regMsg" class="mt-3 text-xs font-medium"></div>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-6 border border-blue-100 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2 mb-3">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span> Guidelines & Security
+              </h3>
+              <ul class="space-y-3 text-xs text-slate-600">
+                <li class="flex items-start gap-2">
+                  <span class="text-blue-600 font-bold">✓</span> <b>Open Registration:</b> Any valid email address can be used to create a student account.
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="text-blue-600 font-bold">✓</span> <b>Unique Entry Codes:</b> Registering for events generates a secure 8-character uppercase entry code with live QR pass.
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="text-blue-600 font-bold">✓</span> <b>Row Level Security:</b> All user data and registrations are protected by Firestore Security Rules.
+                </li>
               </ul>
             </div>
-          </div>
-        </div>
-
-        <!-- Student Login Sub-window -->
-        <div class="sub-window" id="studentLoginSub">
-          <div class="grid-2">
-            <div class="card" style="background: radial-gradient(circle at top, #eef2ff 0, #ffffff 55%);">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot"></span>Student Login</div>
-                  <div class="card-sub">After login, events and registration will be visible.</div>
-                </div>
-              </div>
-
-              <div class="field-group">
-                <label>Email (must be @stpetershyd.com)</label>
-                <input id="loginEmail" class="input" placeholder="name@stpetershyd.com" />
-              </div>
-              <div class="field-group">
-                <label>Password</label>
-                <input id="loginPass" type="password" class="input" placeholder="Your password" />
-              </div>
-
-              <div class="field-group">
-                <button class="btn" id="loginBtn">Login as Student</button>
-                <button class="btn secondary" id="clearLoginBtn">Clear</button>
-              </div>
-
-              <div class="field-group">
-                <button class="btn link" id="forgotToggle">Forgot password?</button>
-              </div>
-
-              <div id="loginMsg" class="note"></div>
-            </div>
-
-            <div class="card" id="forgotCard">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#f97316;"></span>Reset Password (Demo)</div>
-                  <div class="card-sub">Reset using college email only (no OTP).</div>
-                </div>
-              </div>
-
-              <div class="field-group">
-                <label>Registered College Email</label>
-                <input id="fpEmail" class="input" placeholder="name@stpetershyd.com" />
-              </div>
-              <div class="field-group">
-                <label>New Password</label>
-                <input id="fpNewPass" type="password" class="input" placeholder="New password (min 6 chars)" />
-              </div>
-              <div class="field-group">
-                <button class="btn" id="fpSubmit">Update Password</button>
-                <button class="btn secondary" id="fpClear">Clear</button>
-              </div>
-              <div id="fpMsg" class="note"></div>
-
-              <div class="note" style="margin-top:10px;">* Real systems use email OTP / reset link. Here it is simplified for academic demo.</div>
-            </div>
-          </div>
-
-          <!-- After-login area: events + registrations (only after login) -->
-          <div id="studentAfterLogin" class="grid-2" style="margin-top:16px; display:none;">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#22c55e;"></span>Available Events</div>
-                  <div class="card-sub">Displayed only after successful login.</div>
-                </div>
-              </div>
-              <div id="eventsList" class="note" style="margin-top:8px;"></div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#6366f1;"></span>My Registrations</div>
-                  <div class="card-sub">Contains your unique entry codes.</div>
-                </div>
-              </div>
-              <div id="myRegs" class="note" style="margin-top:8px;"></div>
+            <div class="mt-6 pt-4 border-t border-blue-200/60 flex items-center justify-between text-xs text-slate-500">
+              <span>Need help? Contact college IT cell.</span>
+              <button onclick="switchStudentSub('login')" class="text-blue-600 font-semibold hover:underline">Already registered? Login</button>
             </div>
           </div>
         </div>
+
+        <!-- 2. Student Login Sub-window -->
+        <div id="subWindowLogin" class="sub-window grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-blue-600"></span> Student Portal Login
+                </h3>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">College Email</label>
+                  <input id="loginEmail" type="email"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    placeholder="your@email.com" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                  <div class="relative">
+                    <input id="loginPass" type="password"
+                      class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      placeholder="Your password" />
+                    <button type="button" onclick="togglePasswordVisibility('loginPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6">
+              <div class="flex items-center gap-3">
+                <button onclick="handleStudentLogin()"
+                  class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/20">Login
+                  to Dashboard</button>
+                <button onclick="clearStudentLogin()"
+                  class="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-medium transition-all">Clear</button>
+              </div>
+
+              <!-- Google OAuth Login Option -->
+              <div class="relative my-4">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-slate-400 font-medium">Or</span></div>
+              </div>
+              <button type="button" onclick="handleGoogleSignIn()" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-sm">
+                <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                Continue with Google
+              </button>
+
+              <div class="flex items-center justify-between mt-3">
+                <div id="loginMsg" class="text-xs font-medium"></div>
+                <button onclick="toggleForgotPasswordModal(true)" class="text-xs text-blue-600 hover:underline font-medium">Forgot Password?</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Welcome Back Student!
+              </h3>
+              <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                Access your college events schedule, reserve your seats, and access your unique gate passes with QR codes.
+              </p>
+              <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 text-xs space-y-2">
+                <div class="font-semibold text-emerald-400">Official Access Only:</div>
+                <div class="text-slate-300">Sign in using the email and password you registered with.</div>
+              </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-700/80 flex items-center justify-between text-xs text-slate-400">
+              <span>Firebase Auth</span>
+              <button onclick="switchStudentSub('register')" class="text-blue-400 font-semibold hover:underline">New student? Register</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Student Dashboard Sub-window (Active post-login view) -->
+        <div id="subWindowDashboard" class="sub-window hidden space-y-6">
+          <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-2xl p-6 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <div class="text-xs uppercase tracking-wider text-blue-200 font-semibold mb-1">Student Portal Session Active</div>
+              <h2 id="studentWelcomeBanner" class="text-lg sm:text-xl font-bold">Welcome, Student</h2>
+              <p class="text-xs text-blue-100 mt-0.5" id="studentEmailBanner">your@email.com</p>
+            </div>
+            <button onclick="handleStudentLogout()"
+              class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-all border border-white/20 backdrop-blur-sm">
+              🚪 Logout Session
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Available Events -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col h-[520px]">
+              <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Available College Events
+                  </h3>
+                  <p class="text-xs text-slate-500">Browse upcoming events and register instantly</p>
+                </div>
+                <span id="eventCountBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">0 Events</span>
+              </div>
+              <div class="mb-3">
+                <input id="studentEventSearch" type="text" placeholder="🔍 Search events (title, venue)..."
+                  class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  oninput="debouncedStudentSearch(this.value)" />
+              </div>
+              <div id="studentEventsList" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-1">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- My Registrations & Entry Codes -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col h-[520px]">
+              <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-600"></span> My Registrations & Entry Passes
+                  </h3>
+                  <p class="text-xs text-slate-500">Present your unique entry codes or QR passes at event gates</p>
+                </div>
+                <span id="regCountBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">0 Passes</span>
+              </div>
+              <div id="studentMyRegsList" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-1">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
       </section>
 
       <!-- ================= ADMIN WINDOW ================= -->
-      <section id="adminWindow" class="window">
-        <div class="window-title">Admin Window <span>Event creation & entry verification</span></div>
+      <section id="adminWindow" class="window hidden animate-fade-in">
 
         <!-- Admin Login Card -->
-        <div class="card" style="margin-bottom:16px; background: radial-gradient(circle at top right, #fee2e2 0, #ffffff 55%);">
-          <div class="flex-between">
-            <div>
-              <div class="card-title"><span class="dot" style="background:#f97316;"></span>Admin Portal</div>
-              <div class="card-sub">Only coordinators / staff should login here.</div>
-            </div>
-          </div>
+        <div id="adminLoginCard" class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div class="max-w-md">
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Admin & Coordinator Gateway
+              </h2>
+              <p class="text-xs text-slate-500 mt-1">Authorized personnel only. Manage college events, verify attendee codes, and inspect live attendance statistics.</p>
 
-          <div class="grid-2" style="margin-top:10px;">
-            <div>
-              <div class="field-group">
-                <label>Admin Email</label>
-                <input id="adminEmail" class="input" placeholder="admin@college.edu" />
+              <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 space-y-1">
+                <div class="font-semibold flex items-center gap-1.5 text-slate-800">🛡️ Access Verification</div>
+                <div>Sign in with your verified college credentials. Administrative rights are enforced via Firestore Security Rules.</div>
               </div>
-              <div class="field-group">
-                <label>Password</label>
-                <input id="adminPass" type="password" class="input" placeholder="Admin password" />
-              </div>
-              <div class="field-group">
-                <button class="btn" id="adminLoginBtn">Login as Admin</button>
-                <button class="btn secondary" id="adminClearBtn">Clear</button>
-              </div>
-              <div id="adminLoginMsg" class="note"></div>
             </div>
 
-            <div>
-              <div class="note"><b>Demo Admin Credentials</b></div>
-              <div class="note">Email: <b>admin@college.edu</b></div>
-              <div class="note">Password: <b>Admin@123</b></div>
-              <div class="note" style="margin-top:8px;">Post login:</div>
-              <ul class="note" style="padding-left:18px; margin-top:4px;">
-                <li>Create & manage events.</li>
-                <li>View registration stats with pie chart.</li>
-                <li>Type student entry code and verify details.</li>
-                <li>Mark students as ENTERED for event hall access.</li>
-              </ul>
+            <div class="w-full md:w-96 bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Admin Email</label>
+                <input id="adminEmail" type="email"
+                  class="w-full px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  placeholder="admin@yourdomain.com" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                <div class="relative">
+                  <input id="adminPass" type="password"
+                    class="w-full px-3.5 pr-10 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    placeholder="Password" />
+                  <button type="button" onclick="togglePasswordVisibility('adminPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 pt-1">
+                <button onclick="handleAdminLogin()"
+                  class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all shadow-md">Login
+                  as Admin</button>
+                <button onclick="clearAdminLogin()"
+                  class="px-3 py-2 border border-slate-200 hover:bg-white text-slate-600 rounded-lg text-xs font-medium">Clear</button>
+              </div>
+              <div class="relative my-2">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                <div class="relative flex justify-center text-xs uppercase"><span class="bg-slate-50 px-2 text-slate-400 font-medium">Or</span></div>
+              </div>
+              <button type="button" onclick="handleAdminGoogleSignIn()" class="w-full flex items-center justify-center gap-2 py-2 px-3 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-sm">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                Continue with Google
+              </button>
+              <div id="adminLoginMsg" class="text-xs font-medium"></div>
             </div>
           </div>
         </div>
 
-        <!-- Admin Dashboard (hidden until admin login) -->
-        <div id="adminDashboard" style="display:none;">
-          <div class="grid-2">
-            <!-- Create/manage events -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot"></span>Create New Event</div>
-                  <div class="card-sub">Events here will be shown to students after login.</div>
-                </div>
-              </div>
+        <!-- Admin Dashboard Content (Hidden until authenticated) -->
+        <div id="adminDashboardContent" class="hidden space-y-6">
 
-              <div class="field-group">
-                <label>Title</label>
-                <input id="evTitle" class="input" placeholder="e.g. Technical Quiz" />
+          <!-- Admin Session Banner -->
+          <div class="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-slate-800">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-lg">
+                🛡️
               </div>
-              <div class="field-group">
-                <label>Date</label>
-                <input id="evDate" type="date" class="input" />
+              <div>
+                <div class="text-xs uppercase tracking-wider text-amber-400 font-semibold">Administrator Control Panel</div>
+                <h3 class="text-base sm:text-lg font-bold text-white">System Management & Verification Center</h3>
               </div>
-              <div class="field-group">
-                <label>Time</label>
-                <input id="evTime" type="time" class="input" />
-              </div>
-              <div class="field-group">
-                <label>Venue</label>
-                <input id="evVenue" class="input" placeholder="Main Auditorium / Lab-1" />
-              </div>
-              <div class="field-group">
-                <label>Description</label>
-                <textarea id="evDesc" rows="3" class="input" placeholder="Short info about the event."></textarea>
-              </div>
-
-              <div class="field-group">
-                <button class="btn" id="createEventBtn">Create Event</button>
-                <button class="btn secondary" id="clearEventBtn">Clear</button>
-              </div>
-
-              <div id="eventMsg" class="note"></div>
             </div>
-
-            <!-- Existing events -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#22c55e;"></span>Events List</div>
-                  <div class="card-sub">Edit / delete existing events.</div>
-                </div>
-              </div>
-              <div id="eventsAdminList" class="note" style="margin-top:8px;"></div>
-            </div>
+            <button onclick="handleAdminLogout()"
+              class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-semibold transition-all border border-slate-700">
+              🔒 Lock Admin Session
+            </button>
           </div>
 
-          <div class="grid-2" style="margin-top:18px;">
-            <!-- Entry code check -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#f97316;"></span>Entry Code Verification</div>
-                  <div class="card-sub">Type code, view student & event, then allow entry.</div>
+          <!-- Top Row: Create Event & Entry Verification -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- 1. Create New Event -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                  <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-blue-600"></span> Create New Event
+                  </h3>
+                  <span class="text-xs text-slate-400">Published instantly to student feeds</span>
+                </div>
+
+                <div class="space-y-3.5">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Event Title</label>
+                    <input id="evTitle" type="text"
+                      class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="e.g. National Coding Symposium 2026" />
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
+                      <input id="evDate" type="date"
+                        class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1">Time</label>
+                      <input id="evTime" type="time"
+                        class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+                      <input id="evCapacity" type="number" min="1" value="100"
+                        class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="100" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Venue / Hall</label>
+                    <input id="evVenue" type="text"
+                      class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="Main Auditorium / Lab-3" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Description & Guidelines</label>
+                    <textarea id="evDesc" rows="2"
+                      class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="Brief details about event rules and prizes..."></textarea>
+                  </div>
                 </div>
               </div>
 
-              <div class="field-group">
-                <label>Entry Code (given by student)</label>
-                <input id="entryCodeInput" class="input" placeholder="e.g. BLUE-TIGER-STAR-456" />
+              <div class="mt-5 pt-3 border-t border-slate-100">
+                <div class="flex items-center gap-3">
+                  <button onclick="handleCreateEvent()"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition-all shadow-md shadow-blue-500/20">Publish
+                    Event</button>
+                  <button onclick="clearEventForm()"
+                    class="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-medium">Clear</button>
+                </div>
+                <div id="eventMsg" class="mt-2 text-xs font-medium"></div>
               </div>
-              <div class="field-group">
-                <button class="btn" id="findCodeBtn">Find Details</button>
-                <button class="btn secondary" id="clearEntryBtn">Clear</button>
-              </div>
-              <div id="entryMsg" class="note"></div>
-
-              <div id="entryDetailCard" class="note" style="margin-top:10px;"></div>
             </div>
 
-            <!-- Stats + chart -->
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title"><span class="dot" style="background:#6366f1;"></span>Live Stats</div>
-                  <div class="card-sub">Registrations vs entries across all events.</div>
+            <!-- 2. Entry Code Verification Gate -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                  <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span> Gate Entry Code Verification
+                  </h3>
+                  <button id="btnToggleScanner" onclick="toggleCameraScanner()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+                    📷 Scan QR
+                  </button>
+                </div>
+
+                <!-- Camera QR Scanner Viewport Container -->
+                <div id="qrScannerContainer" class="hidden mb-3 p-2 bg-slate-900 rounded-xl border border-slate-800">
+                  <div id="qrReader" class="w-full overflow-hidden rounded-lg"></div>
+                </div>
+
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Student Entry Code</label>
+                    <div class="flex gap-2">
+                      <input id="entryCodeInput" type="text"
+                        class="flex-grow px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-mono uppercase tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                        placeholder="e.g. ABCDEFGH" />
+                      <button onclick="handleVerifyEntryCode()"
+                        class="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition-all shadow-sm">Verify</button>
+                    </div>
+                  </div>
+
+                  <div id="entryVerificationResult" class="min-h-[140px] flex flex-col justify-center">
+                    <div class="text-center py-6 text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-xl">
+                      Enter a student entry code or use the camera scanner to verify ticket validity and grant gate access.
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div id="statsRow" class="row" style="margin-top:4px;"></div>
-              <canvas id="regChart" style="max-width:360px; margin-top:12px;"></canvas>
+              <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span id="entryMsg" class="font-medium">Ready for verification</span>
+                <button onclick="clearEntryVerification()" class="text-slate-600 hover:text-slate-900 font-medium">Reset Gate</button>
+              </div>
+            </div>
 
-              <div class="field-group" style="margin-top:14px;">
-                <div style="font-size:13px; font-weight:600; margin-bottom:4px;">Per-event summary</div>
-                <table class="table-like" id="eventSummaryTable">
+          </div>
+
+          <!-- Middle Row: Events Management List & Live Stats / Chart -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Events Administration List -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col h-[480px]">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Active Events Management
+                </h3>
+              </div>
+              <div class="mb-2.5">
+                <input id="adminEventSearch" type="text" placeholder="🔍 Search events..."
+                  class="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  oninput="debouncedAdminSearch(this.value)" />
+              </div>
+              <div id="adminEventsList" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-1">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Attendance Pie Chart & Summary Stats -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col h-[480px]">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Live Attendance Analytics
+                </h3>
+              </div>
+
+              <div id="adminStatsPills" class="grid grid-cols-3 gap-2 mb-4">
+                <!-- Pills populated dynamically -->
+              </div>
+
+              <div class="flex-grow flex items-center justify-center relative">
+                <canvas id="attendancePieChart" class="max-h-[190px]"></canvas>
+              </div>
+            </div>
+
+            <!-- Per-Event Breakdown Table -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col h-[480px]">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-blue-600"></span> Per-Event Summary
+                </h3>
+              </div>
+              <div class="flex-grow overflow-y-auto custom-scrollbar pr-1">
+                <table class="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr>
-                      <th>Event</th>
-                      <th>Registered</th>
-                      <th>Entered</th>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                      <th class="p-2.5 font-semibold rounded-l-lg">Event Title</th>
+                      <th class="p-2.5 font-semibold text-center">Reg.</th>
+                      <th class="p-2.5 font-semibold text-center rounded-r-lg">Entered</th>
                     </tr>
                   </thead>
-                  <tbody></tbody>
+                  <tbody id="adminEventSummaryTableBody" class="divide-y divide-slate-100">
+                    <!-- Populated dynamically -->
+                  </tbody>
                 </table>
               </div>
             </div>
+
           </div>
 
-          <!-- Registrations list -->
-          <div class="card" style="margin-top:18px;">
-            <div class="card-header">
+          <!-- Bottom Row: All System Registrations Audit Log -->
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
-                <div class="card-title"><span class="dot" style="background:#0ea5e9;"></span>All Registrations</div>
-                <div class="card-sub">Detailed view of all students & their codes.</div>
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-blue-600"></span> Comprehensive Student Registrations Log
+                </h3>
+                <p class="text-xs text-slate-500">Audit trail of all student event registrations and gate entry statuses</p>
               </div>
+              <span id="adminTotalRegsBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">0 Records</span>
             </div>
-            <div id="regsList" class="note" style="margin-top:10px;"></div>
+            <div id="adminAllRegsList" class="max-h-[350px] overflow-y-auto custom-scrollbar space-y-3 pr-1">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Custom Notification Modal -->
+    <div id="customModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
+        <div class="flex items-center gap-3">
+          <div id="modalIcon" class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">ℹ️</div>
+          <div>
+            <h4 id="modalTitle" class="text-base font-bold text-slate-900">Notification</h4>
+            <p class="text-xs text-slate-500">College Event Management System</p>
           </div>
         </div>
-      </section>
-    </main>
+        <div id="modalMessage" class="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+          Message content goes here...
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="closeCustomModal()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-all">
+            OK, Understood
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Complete Profile Modal (Google OAuth first-time login) -->
+    <div id="completeProfileModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">📝</div>
+            <div>
+              <h4 class="text-base font-bold text-slate-900">Complete Your Student Profile</h4>
+              <p class="text-xs text-slate-500">Please provide your details before accessing events</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeCompleteProfileModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold p-1">✕</button>
+        </div>
+        <div class="space-y-3 pt-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
+            <input id="cpFullName" type="text"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="e.g. Rahul Sharma" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
+            <input id="cpRollNumber" type="text"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono uppercase"
+              placeholder="e.g. 21A91A05G1" />
+          </div>
+          <div id="cpMsg" class="text-xs font-medium"></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeCompleteProfileModal()" class="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-medium">
+            Skip for now
+          </button>
+          <button onclick="handleSaveCompleteProfile()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-all">
+            Save & Continue
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgotPasswordModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-lg">🔑</div>
+          <div>
+            <h4 class="text-base font-bold text-slate-900">Reset Password</h4>
+            <p class="text-xs text-slate-500">Enter the email address you used to register</p>
+          </div>
+        </div>
+        <div class="space-y-3 pt-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Registered College Email</label>
+            <input id="fpEmail" type="email"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="your@email.com" />
+          </div>
+          <div id="fpMsg" class="text-xs font-medium"></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="toggleForgotPasswordModal(false)" class="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-medium">Cancel</button>
+          <button onclick="handleForgotPasswordSubmit()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-all">
+            Send Reset Link
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Set New Password Modal (PASSWORD_RECOVERY) -->
+    <div id="resetPasswordModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">🔒</div>
+          <div>
+            <h4 class="text-base font-bold text-slate-900">Set New Password</h4>
+            <p class="text-xs text-slate-500">Enter your new secure account password</p>
+          </div>
+        </div>
+        <div class="space-y-3 pt-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">New Password</label>
+            <div class="relative">
+              <input id="npNewPass" type="password"
+                class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="Minimum 6 characters" />
+              <button type="button" onclick="togglePasswordVisibility('npNewPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Confirm New Password</label>
+            <div class="relative">
+              <input id="npConfirmPass" type="password"
+                class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="Repeat new password" />
+              <button type="button" onclick="togglePasswordVisibility('npConfirmPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+            </div>
+          </div>
+          <div id="npMsg" class="text-xs font-medium"></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="handleUpdatePasswordSubmit()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-all">
+            Update Password
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Event Modal -->
+    <div id="editEventModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h4 class="text-base font-bold text-slate-900">Edit Event</h4>
+          <button onclick="closeEditEventModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+        </div>
+        <input type="hidden" id="editEvId" />
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">Event Title</label>
+            <input id="editEvTitle" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Date</label>
+              <input id="editEvDate" type="date" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Time</label>
+              <input id="editEvTime" type="time" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
+            </div>
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">Venue</label>
+            <input id="editEvVenue" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">Capacity (Max Attendees)</label>
+            <input id="editEvCapacity" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">Description & Guidelines</label>
+            <textarea id="editEvDesc" rows="3" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs"></textarea>
+          </div>
+          <div id="editEvMsg" class="text-xs font-medium"></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button onclick="closeEditEventModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium">Cancel</button>
+          <button onclick="handleSaveEditEvent()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+
+
   </div>
 
-  <script>
-    // ============== Storage helpers ==============
-    function getStudents() {
-      try { return JSON.parse(localStorage.getItem('students')) || []; } catch (e) { return []; }
-    }
-    function saveStudents(list) { localStorage.setItem('students', JSON.stringify(list)); }
-
-    function getEvents() {
-      try { return JSON.parse(localStorage.getItem('events')) || []; } catch (e) { return []; }
-    }
-    function saveEvents(list) { localStorage.setItem('events', JSON.stringify(list)); }
-
-    function getRegs() {
-      try { return JSON.parse(localStorage.getItem('registrations')) || []; } catch (e) { return []; }
-    }
-    function saveRegs(list) { localStorage.setItem('registrations', JSON.stringify(list)); }
-
-    function escapeHtml(value) {
-      return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    // ============== Live clock ==============
-    function updateClock() {
-      const el = document.getElementById('liveClock');
-      const now = new Date();
-      const datePart = now.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' });
-      const timePart = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      el.textContent = timePart + ' · ' + datePart;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // ============== Top-level windows (Student / Admin) ==============
-    const windows = document.querySelectorAll('.window');
-    const topTabs = document.querySelectorAll('.top-tab-btn');
-    const headerSub = document.getElementById('headerSub');
-    const adminDashboard = document.getElementById('adminDashboard');
-
-    const windowDescriptions = {
-      studentWindow: 'Student window: registration & login',
-      adminWindow: 'Admin window: event management & entry verification'
-    };
-
-    topTabs.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.dataset.window;
-        windows.forEach(w => w.classList.remove('active'));
-        document.getElementById(target).classList.add('active');
-
-        topTabs.forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-
-        headerSub.textContent = windowDescriptions[target] || 'College Event System';
-
-        if (target === 'adminWindow') {
-          const adminLogged = localStorage.getItem('currentAdmin') === 'true';
-          adminDashboard.style.display = adminLogged ? 'block' : 'none';
-          if (adminLogged) {
-            renderEventsAdmin();
-            renderRegistrationsAdmin();
-          }
-        }
-        if (target === 'studentWindow') {
-          const current = localStorage.getItem('currentStudent');
-          if (current) {
-            document.getElementById('studentAfterLogin').style.display = 'grid';
-            renderEventsStudent();
-            renderMyRegistrations();
-          } else {
-            document.getElementById('studentAfterLogin').style.display = 'none';
-          }
-        }
-      });
-    });
-
-    // ============== Student window: sub tabs (register / login) ==============
-    const subBtns = document.querySelectorAll('.sub-tab-btn');
-    const subWindows = document.querySelectorAll('.sub-window');
-
-    subBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.dataset.sub;
-        subWindows.forEach(s => s.classList.remove('active'));
-        document.getElementById(target).classList.add('active');
-        subBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      });
-    });
-
-    // ============== Entry code generator (unique) ==============
-    const CODE_PARTS = ['BLUE','TIGER','STAR','CLOUD','NOVA','ALPHA','BETA','GAMMA','PIXEL','RIDER','FLASH','EAGLE','NEXA','ZION','QUARK','ZEN','VORTEX','EMBER','BLAZE','NIGHT'];
-
-    function generateCodeOnce() {
-      function pick() { return CODE_PARTS[Math.floor(Math.random() * CODE_PARTS.length)]; }
-      const randNum = Math.floor(100 + Math.random() * 900);
-      return pick() + '-' + pick() + '-' + pick() + '-' + randNum;
-    }
-
-    function generateUniqueEntryCode() {
-      const regs = getRegs();
-      let code;
-      let exists = true;
-      let safety = 0;
-      while (exists && safety < 1000) {
-        safety++;
-        code = generateCodeOnce();
-        exists = regs.some(r => (r.entryCode || '').toUpperCase() === code.toUpperCase());
-      }
-      return code;
-    }
-
-    // ============== Student Registration ==============
-    const regMsg = document.getElementById('regMsg');
-
-    document.getElementById('regBtn').addEventListener('click', () => {
-      const name = document.getElementById('regName').value.trim();
-      const roll = document.getElementById('regRoll').value.trim();
-      const email = document.getElementById('regEmail').value.trim().toLowerCase();
-      const pass = document.getElementById('regPass').value;
-
-      if (!name || !roll || !email || pass.length < 6) {
-        regMsg.textContent = 'Fill all fields. Password must be at least 6 characters.';
-        regMsg.className = 'note error';
-        return;
-      }
-      if (!email.endsWith('@stpetershyd.com')) {
-        regMsg.textContent = 'Email must be a college email (ends with @stpetershyd.com).';
-        regMsg.className = 'note error';
-        return;
-      }
-
-      let students = getStudents();
-      if (students.find(s => s.email === email)) {
-        regMsg.textContent = 'Email already registered. Use login.';
-        regMsg.className = 'note error';
-        return;
-      }
-
-      students.push({ name, roll, email, password: pass });
-      saveStudents(students);
-
-      regMsg.textContent = 'Registration successful. You can now login as a student.';
-      regMsg.className = 'note success';
-
-      document.getElementById('regName').value = '';
-      document.getElementById('regRoll').value = '';
-      document.getElementById('regEmail').value = '';
-      document.getElementById('regPass').value = '';
-    });
-
-    document.getElementById('regClear').addEventListener('click', () => {
-      document.getElementById('regName').value = '';
-      document.getElementById('regRoll').value = '';
-      document.getElementById('regEmail').value = '';
-      document.getElementById('regPass').value = '';
-      regMsg.textContent = '';
-      regMsg.className = 'note';
-    });
-
-    // ============== Student Login ==============
-    const loginMsg = document.getElementById('loginMsg');
-
-    document.getElementById('loginBtn').addEventListener('click', () => {
-      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-      const pass = document.getElementById('loginPass').value;
-
-      loginMsg.textContent = '';
-      loginMsg.className = 'note';
-
-      if (!email.endsWith('@stpetershyd.com')) {
-        loginMsg.textContent = 'Use your college email (must end with @stpetershyd.com).';
-        loginMsg.className = 'note error';
-        return;
-      }
-
-      const students = getStudents();
-      const user = students.find(s => s.email === email && s.password === pass);
-
-      if (!user) {
-        loginMsg.textContent = 'Wrong email or password.';
-        loginMsg.className = 'note error';
-        return;
-      }
-
-      localStorage.setItem('currentStudent', email);
-      loginMsg.textContent = 'Login successful. Event list is now visible below.';
-      loginMsg.className = 'note success';
-
-      const after = document.getElementById('studentAfterLogin');
-      after.style.display = 'grid';
-      renderEventsStudent();
-      renderMyRegistrations();
-    });
-
-    document.getElementById('clearLoginBtn').addEventListener('click', () => {
-      document.getElementById('loginEmail').value = '';
-      document.getElementById('loginPass').value = '';
-      loginMsg.textContent = '';
-      loginMsg.className = 'note';
-      document.getElementById('studentAfterLogin').style.display = 'none';
-    });
-
-    // Forgot password (demo)
-    const fpMsg = document.getElementById('fpMsg');
-
-    document.getElementById('forgotToggle').addEventListener('click', () => {
-      document.getElementById('fpEmail').focus();
-    });
-
-    document.getElementById('fpSubmit').addEventListener('click', () => {
-      const email = document.getElementById('fpEmail').value.trim().toLowerCase();
-      const newPass = document.getElementById('fpNewPass').value;
-
-      fpMsg.textContent = '';
-      fpMsg.className = 'note';
-
-      if (!email.endsWith('@stpetershyd.com')) {
-        fpMsg.textContent = 'Use your registered college email.';
-        fpMsg.className = 'note error';
-        return;
-      }
-      if (newPass.length < 6) {
-        fpMsg.textContent = 'New password must be at least 6 characters.';
-        fpMsg.className = 'note error';
-        return;
-      }
-
-      let students = getStudents();
-      let found = false;
-      students = students.map(s => {
-        if (s.email === email) {
-          found = true;
-          return { ...s, password: newPass };
-        }
-        return s;
-      });
-
-      if (!found) {
-        fpMsg.textContent = 'No account found for this email.';
-        fpMsg.className = 'note error';
-        return;
-      }
-
-      saveStudents(students);
-      fpMsg.textContent = 'Password updated successfully. You can login now.';
-      fpMsg.className = 'note success';
-      document.getElementById('fpEmail').value = '';
-      document.getElementById('fpNewPass').value = '';
-    });
-
-    document.getElementById('fpClear').addEventListener('click', () => {
-      document.getElementById('fpEmail').value = '';
-      document.getElementById('fpNewPass').value = '';
-      fpMsg.textContent = '';
-      fpMsg.className = 'note';
-    });
-
-    // ============== Student: Events + Registrations (only after login) ==============
-    function renderEventsStudent() {
-      const list = document.getElementById('eventsList');
-      const events = getEvents();
-      const current = localStorage.getItem('currentStudent');
-      const regs = getRegs().filter(r => r.studentEmail === current);
-      list.innerHTML = '';
-
-      if (!current) {
-        list.textContent = 'Login to see events.';
-        return;
-      }
-
-      if (events.length === 0) {
-        list.textContent = 'No events created yet. Ask admin to add events.';
-        return;
-      }
-
-      events.forEach(ev => {
-        const already = regs.find(r => r.eventId === ev.id);
-        const div = document.createElement('div');
-        div.className = 'event-card';
-        const safeTitle = escapeHtml(ev.title);
-        const safeMeta = [ev.date || '', ev.time || '', ev.venue || '']
-          .filter(Boolean)
-          .map(escapeHtml)
-          .join(' • ');
-        const safeDesc = escapeHtml(ev.desc || '');
-        div.innerHTML = `
-          <div class="flex-between">
-            <div>
-              <div style="font-weight:600;">${safeTitle}</div>
-              <div class="note">${safeMeta}</div>
-            </div>
-            <div>
-              ${
-                already
-                  ? '<span class="tag not-entered">Registered</span>'
-                  : `<button class="btn" style="padding:5px 10px;font-size:11px;" data-evid="${ev.id}">Register</button>`
-              }
-            </div>
-          </div>
-          <div class="note" style="margin-top:6px;">${safeDesc}</div>
-        `;
-        list.appendChild(div);
-      });
-
-      list.querySelectorAll('button[data-evid]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-evid');
-          registerForEvent(id);
-        });
-      });
-    }
-
-    function registerForEvent(eventId) {
-      const current = localStorage.getItem('currentStudent');
-      if (!current) {
-        alert('Please login as student first.');
-        return;
-      }
-      const students = getStudents();
-      const stu = students.find(s => s.email === current);
-      if (!stu) {
-        alert('Student record not found.');
-        return;
-      }
-
-      let regs = getRegs();
-      if (regs.find(r => r.eventId === eventId && r.studentEmail === current)) {
-        alert('Already registered for this event.');
-        return;
-      }
-
-      const entryCode = generateUniqueEntryCode();
-      regs.push({
-        eventId,
-        studentEmail: current,
-        roll: stu.roll,
-        ts: Date.now(),
-        status: 'not-entered',
-        entryCode
-      });
-      saveRegs(regs);
-
-      alert('Registered successfully. Your entry code: ' + entryCode);
-      renderEventsStudent();
-      renderMyRegistrations();
-      renderRegistrationsAdmin(); // refresh admin stats if logged
-    }
-
-    function renderMyRegistrations() {
-      const wrap = document.getElementById('myRegs');
-      const current = localStorage.getItem('currentStudent');
-      const regs = getRegs().filter(r => r.studentEmail === current);
-      const events = getEvents();
-      wrap.innerHTML = '';
-
-      if (!current) {
-        wrap.textContent = 'Login to see your registrations.';
-        return;
-      }
-
-      if (regs.length === 0) {
-        wrap.textContent = 'No registrations yet.';
-        return;
-      }
-
-      regs.forEach(r => {
-        const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
-        const safeTitle = escapeHtml(ev.title);
-        const safeEntryCode = escapeHtml(r.entryCode || 'N/A');
-        const tag = r.status === 'entered'
-          ? '<span class="tag entered">Entered</span>'
-          : '<span class="tag not-entered">Not Entered</span>';
-        const div = document.createElement('div');
-        div.className = 'reg-card';
-        div.innerHTML = `
-          <div class="flex-between">
-            <div>
-              <div style="font-weight:600;">${safeTitle} ${tag}</div>
-              <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
-              <div class="note"><b>Entry Code:</b> ${safeEntryCode}</div>
-              <div class="note">Show this code to the admin at the entry gate.</div>
-            </div>
-          </div>
-        `;
-        wrap.appendChild(div);
-      });
-    }
-
-    // ============== Admin Login ==============
-    const ADMIN_EMAIL = 'admin@college.edu';
-    const ADMIN_PASS = 'Admin@123';
-    const adminLoginMsg = document.getElementById('adminLoginMsg');
-
-    document.getElementById('adminLoginBtn').addEventListener('click', () => {
-      const email = document.getElementById('adminEmail').value.trim().toLowerCase();
-      const pass = document.getElementById('adminPass').value;
-
-      adminLoginMsg.textContent = '';
-      adminLoginMsg.className = 'note';
-
-      if (email === ADMIN_EMAIL && pass === ADMIN_PASS) {
-        localStorage.setItem('currentAdmin', 'true');
-        adminLoginMsg.textContent = 'Admin login successful.';
-        adminLoginMsg.className = 'note success';
-        adminDashboard.style.display = 'block';
-        renderEventsAdmin();
-        renderRegistrationsAdmin();
-      } else {
-        adminLoginMsg.textContent = 'Invalid admin credentials.';
-        adminLoginMsg.className = 'note error';
-        adminDashboard.style.display = 'none';
-      }
-    });
-
-    document.getElementById('adminClearBtn').addEventListener('click', () => {
-      document.getElementById('adminEmail').value = '';
-      document.getElementById('adminPass').value = '';
-      adminLoginMsg.textContent = '';
-      adminLoginMsg.className = 'note';
-      adminDashboard.style.display = 'none';
-      localStorage.removeItem('currentAdmin');
-    });
-
-    // ============== Admin: create / edit / delete events ==============
-    const eventMsg = document.getElementById('eventMsg');
-
-    document.getElementById('createEventBtn').addEventListener('click', () => {
-      const title = document.getElementById('evTitle').value.trim();
-      const date = document.getElementById('evDate').value;
-      const time = document.getElementById('evTime').value;
-      const venue = document.getElementById('evVenue').value.trim();
-      const desc = document.getElementById('evDesc').value.trim();
-
-      if (!title || !date) {
-        eventMsg.textContent = 'Title and Date are required.';
-        eventMsg.className = 'note error';
-        return;
-      }
-
-      const events = getEvents();
-      const id = 'ev_' + Date.now();
-      events.push({ id, title, date, time, venue, desc });
-      saveEvents(events);
-
-      eventMsg.textContent = 'Event created successfully.';
-      eventMsg.className = 'note success';
-
-      document.getElementById('evTitle').value = '';
-      document.getElementById('evDate').value = '';
-      document.getElementById('evTime').value = '';
-      document.getElementById('evVenue').value = '';
-      document.getElementById('evDesc').value = '';
-
-      renderEventsAdmin();
-    });
-
-    document.getElementById('clearEventBtn').addEventListener('click', () => {
-      document.getElementById('evTitle').value = '';
-      document.getElementById('evDate').value = '';
-      document.getElementById('evTime').value = '';
-      document.getElementById('evVenue').value = '';
-      document.getElementById('evDesc').value = '';
-      eventMsg.textContent = '';
-      eventMsg.className = 'note';
-    });
-
-    function renderEventsAdmin() {
-      const wrap = document.getElementById('eventsAdminList');
-      const events = getEvents();
-      wrap.innerHTML = '';
-
-      if (events.length === 0) {
-        wrap.textContent = 'No events created yet.';
-        return;
-      }
-
-      events.forEach(ev => {
-        const div = document.createElement('div');
-        div.className = 'event-card';
-        const safeTitle = escapeHtml(ev.title);
-        const safeMeta = [ev.date || '', ev.time || '', ev.venue || '']
-          .filter(Boolean)
-          .map(escapeHtml)
-          .join(' • ');
-        const safeDesc = escapeHtml(ev.desc || '');
-        div.innerHTML = `
-          <div class="flex-between">
-            <div>
-              <div style="font-weight:600;">${safeTitle}</div>
-              <div class="note">${safeMeta}</div>
-            </div>
-            <div class="row">
-              <button class="btn secondary" style="padding:4px 10px;font-size:11px;" data-edit="${ev.id}">Edit</button>
-              <button class="btn" style="padding:4px 10px;font-size:11px;" data-del="${ev.id}">Delete</button>
-            </div>
-          </div>
-          <div class="note" style="margin-top:6px;">${safeDesc}</div>
-        `;
-        wrap.appendChild(div);
-      });
-
-      wrap.querySelectorAll('button[data-del]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-del');
-          deleteEvent(id);
-        });
-      });
-
-      wrap.querySelectorAll('button[data-edit]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-edit');
-          editEvent(id);
-        });
-      });
-    }
-
-    function deleteEvent(id) {
-      if (!confirm('Delete this event? All registrations for this event will be removed.')) return;
-      let events = getEvents().filter(e => e.id !== id);
-      saveEvents(events);
-      const regs = getRegs().filter(r => r.eventId !== id);
-      saveRegs(regs);
-      renderEventsAdmin();
-      renderRegistrationsAdmin();
-      const current = localStorage.getItem('currentStudent');
-      if (current) {
-        renderEventsStudent();
-        renderMyRegistrations();
-      }
-    }
-
-    function editEvent(id) {
-      const events = getEvents();
-      const ev = events.find(e => e.id === id);
-      if (!ev) return;
-      const title = prompt('Title', ev.title) || ev.title;
-      const date = prompt('Date (YYYY-MM-DD)', ev.date) || ev.date;
-      const time = prompt('Time (HH:MM)', ev.time || '') || ev.time;
-      const venue = prompt('Venue', ev.venue || '') || ev.venue;
-      const desc = prompt('Description', ev.desc || '') || ev.desc;
-      ev.title = title;
-      ev.date = date;
-      ev.time = time;
-      ev.venue = venue;
-      ev.desc = desc;
-      saveEvents(events);
-      renderEventsAdmin();
-      const current = localStorage.getItem('currentStudent');
-      if (current) renderEventsStudent();
-    }
-
-    // ============== Admin: entry code verification ==============
-    const entryMsg = document.getElementById('entryMsg');
-    const entryDetailCard = document.getElementById('entryDetailCard');
-    let lastFoundCode = null;
-
-    document.getElementById('findCodeBtn').addEventListener('click', () => {
-      const code = document.getElementById('entryCodeInput').value.trim().toUpperCase();
-      entryMsg.textContent = '';
-      entryMsg.className = 'note';
-      entryDetailCard.innerHTML = '';
-
-      if (!code) {
-        entryMsg.textContent = 'Enter an entry code.';
-        entryMsg.className = 'note error';
-        return;
-      }
-
-      const regs = getRegs();
-      const idx = regs.findIndex(r => (r.entryCode || '').toUpperCase() === code);
-      if (idx === -1) {
-        entryMsg.textContent = 'No registration found for this code.';
-        entryMsg.className = 'note error';
-        return;
-      }
-
-      const r = regs[idx];
-      const students = getStudents();
-      const events = getEvents();
-      const stu = students.find(s => s.email === r.studentEmail) || { name: r.studentEmail, roll: r.roll || 'NA' };
-      const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
-      const safeName = escapeHtml(stu.name);
-      const safeRoll = escapeHtml(stu.roll);
-      const safeEmail = escapeHtml(stu.email);
-      const safeEventTitle = escapeHtml(ev.title);
-      const safeEntryCode = escapeHtml(r.entryCode || 'N/A');
-
-      const tag = r.status === 'entered'
-        ? '<span class="tag entered">Already Entered</span>'
-        : '<span class="tag not-entered">Not Entered</span>';
-
-      entryDetailCard.innerHTML = `
-        <div class="reg-card">
-          <div class="flex-between">
-            <div>
-              <div style="font-weight:600;">${safeName} (${safeRoll}) ${tag}</div>
-              <div class="note">${safeEmail}</div>
-              <div class="note">Event: ${safeEventTitle}</div>
-              <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
-              <div class="note"><b>Entry Code:</b> ${safeEntryCode}</div>
-            </div>
-          </div>
-          <div class="field-group" style="margin-top:8px;">
-            <button class="btn" id="markEntryNow">Mark as ENTERED</button>
-          </div>
-        </div>
-      `;
-
-      lastFoundCode = code;
-      entryMsg.textContent = 'If details are correct, click Mark as ENTERED.';
-      entryMsg.className = 'note';
-
-      const markBtn = document.getElementById('markEntryNow');
-      markBtn.addEventListener('click', () => {
-        markEntryByCode(lastFoundCode);
-      });
-    });
-
-    function markEntryByCode(code) {
-      let regs = getRegs();
-      let found = false;
-      regs = regs.map(r => {
-        if ((r.entryCode || '').toUpperCase() === code) {
-          found = true;
-          return { ...r, status: 'entered' };
-        }
-        return r;
-      });
-
-      if (!found) {
-        entryMsg.textContent = 'Could not find registration to update.';
-        entryMsg.className = 'note error';
-        return;
-      }
-
-      saveRegs(regs);
-      entryMsg.textContent = 'Entry marked as ENTERED for code: ' + code;
-      entryMsg.className = 'note success';
-      entryDetailCard.innerHTML = '';
-      document.getElementById('entryCodeInput').value = '';
-      renderRegistrationsAdmin();
-      const current = localStorage.getItem('currentStudent');
-      if (current) renderMyRegistrations();
-    }
-
-    document.getElementById('clearEntryBtn').addEventListener('click', () => {
-      document.getElementById('entryCodeInput').value = '';
-      entryMsg.textContent = '';
-      entryMsg.className = 'note';
-      entryDetailCard.innerHTML = '';
-    });
-
-    // ============== Admin: registrations + stats + chart ==============
-    let regChart = null;
-
-    function renderRegistrationsAdmin() {
-      const regsWrap = document.getElementById('regsList');
-      const statsRow = document.getElementById('statsRow');
-      const tblBody = document.querySelector('#eventSummaryTable tbody');
-      const regs = getRegs();
-      const students = getStudents();
-      const events = getEvents();
-
-      regsWrap.innerHTML = '';
-      statsRow.innerHTML = '';
-      tblBody.innerHTML = '';
-
-      const total = regs.length;
-      let entered = 0;
-      regs.forEach(r => { if (r.status === 'entered') entered++; });
-      const notEntered = total - entered;
-
-      statsRow.innerHTML = `
-        <div class="stat-pill">Total Registered: <b>${total}</b></div>
-        <div class="stat-pill">Entered: <b>${entered}</b></div>
-        <div class="stat-pill">Not Entered: <b>${notEntered}</b></div>
-      `;
-
-      const ctx = document.getElementById('regChart').getContext('2d');
-      if (regChart) regChart.destroy();
-      regChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-          labels: ['Entered', 'Not Entered'],
-          datasets: [{
-            data: [entered, notEntered],
-            backgroundColor: ['#22c55e', '#f97316']
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { position: 'bottom' } }
-        }
-      });
-
-      if (regs.length === 0) {
-        regsWrap.textContent = 'No registrations yet.';
-        return;
-      }
-
-      // Per-event summary
-      const eventStats = {};
-      events.forEach(e => {
-        eventStats[e.id] = { title: e.title, reg: 0, ent: 0 };
-      });
-      regs.forEach(r => {
-        if (!eventStats[r.eventId]) {
-          eventStats[r.eventId] = { title: '[Deleted Event]', reg: 0, ent: 0 };
-        }
-        eventStats[r.eventId].reg++;
-        if (r.status === 'entered') eventStats[r.eventId].ent++;
-      });
-
-      Object.values(eventStats).forEach(st => {
-        const tr = document.createElement('tr');
-        const safeTitle = escapeHtml(st.title);
-        tr.innerHTML = `
-          <td>${safeTitle}</td>
-          <td>${st.reg}</td>
-          <td>${st.ent}</td>
-        `;
-        tblBody.appendChild(tr);
-      });
-
-      // Detailed registration cards
-      regs.forEach(r => {
-        const stu = students.find(s => s.email === r.studentEmail) || { name: r.studentEmail, roll: r.roll || 'NA' };
-        const ev = events.find(e => e.id === r.eventId) || { title: '[Deleted Event]' };
-        const card = document.createElement('div');
-        card.className = 'reg-card';
-        const safeName = escapeHtml(stu.name);
-        const safeRoll = escapeHtml(stu.roll);
-        const safeEmail = escapeHtml(stu.email);
-        const safeEventTitle = escapeHtml(ev.title);
-        const safeEntryCode = escapeHtml(r.entryCode || 'N/A');
-        const tag = r.status === 'entered'
-          ? '<span class="tag entered">Entered</span>'
-          : '<span class="tag not-entered">Not Entered</span>';
-        card.innerHTML = `
-          <div class="flex-between">
-            <div>
-              <div style="font-weight:600;">${safeName} (${safeRoll}) ${tag}</div>
-              <div class="note">${safeEmail}</div>
-              <div class="note">Event: ${safeEventTitle}</div>
-              <div class="note">Registered at: ${new Date(r.ts).toLocaleString()}</div>
-              <div class="note"><b>Entry Code:</b> ${safeEntryCode}</div>
-            </div>
-          </div>
-        `;
-        regsWrap.appendChild(card);
-      });
-    }
-
-    // ============== Initial load ==============
-    (function init() {
-      const currentStudent = localStorage.getItem('currentStudent');
-      if (currentStudent) {
-        document.getElementById('studentAfterLogin').style.display = 'grid';
-        renderEventsStudent();
-        renderMyRegistrations();
-      }
-      const admin = localStorage.getItem('currentAdmin') === 'true';
-      adminDashboard.style.display = admin ? 'block' : 'none';
-      if (admin) {
-        renderEventsAdmin();
-        renderRegistrationsAdmin();
-      }
-    })();
-  </script>
+  <!-- Application Logic & Firebase Integration -->
+  <script src="firebase-client.js"></script>
+  <script src="app.js"></script>
 </body>
+
 </html>

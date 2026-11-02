@@ -1,0 +1,15 @@
+﻿# Environment variables — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Node / build output
+node_modules/
+dist/
+build/
+.netlify/
+
+# Generated / editor files
+*.local
+.DS_Store
+Thumbs.db
