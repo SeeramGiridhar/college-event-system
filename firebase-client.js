@@ -411,7 +411,6 @@ async function apiRegisterForEvent(eventId) {
           studentEmail: user.email,
           rollNumber:   profile?.roll_number || '',
           entryCode:    candidateCode,
-          entry_code:   candidateCode,
           entered:      false,
           enteredAt:    null,
           registeredAt: firebase.firestore.FieldValue.serverTimestamp()
