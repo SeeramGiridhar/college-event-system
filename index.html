@@ -11,34 +11,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-          colors: {
-            brand: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              900: '#1e3a8a',
-            }
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Compiled Tailwind CSS (optimized standalone stylesheet, ~5 KB gzipped) -->
+  <link rel="stylesheet" href="styles.css" />
 
   <!-- Firebase 9 compat (same API as v8, works with plain CDN, no bundler) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <!-- Chart.js and HTML5-QRCode are lazy-loaded dynamically on demand in app.js -->
+  <!-- QRCode, Chart.js and HTML5-QRCode are lazy-loaded dynamically on demand in app.js -->
 
   <style>
     body {
@@ -169,30 +149,30 @@
 
               <div class="space-y-4">
                 <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
+                  <label for="regName" class="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
                   <input id="regName" type="text"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     placeholder="e.g. Rahul Sharma" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
+                  <label for="regRoll" class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
                   <input id="regRoll" type="text"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono uppercase"
                     placeholder="e.g. 21A91A05G1" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
+                  <label for="regEmail" class="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
                   <input id="regEmail" type="email"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     placeholder="your@email.com" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                  <label for="regPass" class="block text-xs font-medium text-slate-600 mb-1">Password</label>
                   <div class="relative">
                     <input id="regPass" type="password"
                       class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       placeholder="Minimum 6 characters" />
-                    <button type="button" onclick="togglePasswordVisibility('regPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+                    <button type="button" onclick="togglePasswordVisibility('regPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password" aria-label="Toggle password visibility">👁️</button>
                   </div>
                 </div>
               </div>
@@ -257,18 +237,18 @@
 
               <div class="space-y-4">
                 <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">College Email</label>
+                  <label for="loginEmail" class="block text-xs font-medium text-slate-600 mb-1">College Email</label>
                   <input id="loginEmail" type="email"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     placeholder="your@email.com" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                  <label for="loginPass" class="block text-xs font-medium text-slate-600 mb-1">Password</label>
                   <div class="relative">
                     <input id="loginPass" type="password"
                       class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       placeholder="Your password" />
-                    <button type="button" onclick="togglePasswordVisibility('loginPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+                    <button type="button" onclick="togglePasswordVisibility('loginPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password" aria-label="Toggle password visibility">👁️</button>
                   </div>
                 </div>
               </div>
@@ -348,6 +328,7 @@
               </div>
               <div class="mb-3">
                 <input id="studentEventSearch" type="text" placeholder="🔍 Search events (title, venue)..."
+                  aria-label="Search events by title or venue"
                   class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   oninput="debouncedStudentSearch(this.value)" />
               </div>
@@ -396,18 +377,18 @@
 
             <div class="w-full md:w-96 bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Admin Email</label>
+                <label for="adminEmail" class="block text-xs font-medium text-slate-600 mb-1">Admin Email</label>
                 <input id="adminEmail" type="email"
                   class="w-full px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   placeholder="admin@yourdomain.com" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+                <label for="adminPass" class="block text-xs font-medium text-slate-600 mb-1">Password</label>
                 <div class="relative">
                   <input id="adminPass" type="password"
                     class="w-full px-3.5 pr-10 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                     placeholder="Password" />
-                  <button type="button" onclick="togglePasswordVisibility('adminPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+                  <button type="button" onclick="togglePasswordVisibility('adminPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password" aria-label="Toggle password visibility">👁️</button>
                 </div>
               </div>
               <div class="flex items-center gap-2 pt-1">
@@ -465,37 +446,37 @@
 
                 <div class="space-y-3.5">
                   <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Event Title</label>
+                    <label for="evTitle" class="block text-xs font-medium text-slate-600 mb-1">Event Title</label>
                     <input id="evTitle" type="text"
                       class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="e.g. National Coding Symposium 2026" />
                   </div>
                   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
+                      <label for="evDate" class="block text-xs font-medium text-slate-600 mb-1">Date</label>
                       <input id="evDate" type="date"
                         class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label class="block text-xs font-medium text-slate-600 mb-1">Time</label>
+                      <label for="evTime" class="block text-xs font-medium text-slate-600 mb-1">Time</label>
                       <input id="evTime" type="time"
                         class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+                      <label for="evCapacity" class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
                       <input id="evCapacity" type="number" min="1" value="100"
                         class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         placeholder="100" />
                     </div>
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Venue / Hall</label>
+                    <label for="evVenue" class="block text-xs font-medium text-slate-600 mb-1">Venue / Hall</label>
                     <input id="evVenue" type="text"
                       class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="Main Auditorium / Lab-3" />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Description & Guidelines</label>
+                    <label for="evDesc" class="block text-xs font-medium text-slate-600 mb-1">Description & Guidelines</label>
                     <textarea id="evDesc" rows="2"
                       class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="Brief details about event rules and prizes..."></textarea>
@@ -534,9 +515,10 @@
 
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Student Entry Code</label>
+                    <label for="entryCodeInput" class="block text-xs font-medium text-slate-600 mb-1">Student Entry Code</label>
                     <div class="flex gap-2">
                       <input id="entryCodeInput" type="text"
+                        aria-label="Student 8-character entry code"
                         class="flex-grow px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-mono uppercase tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                         placeholder="e.g. ABCDEFGH" />
                       <button onclick="handleVerifyEntryCode()"
@@ -572,6 +554,7 @@
               </div>
               <div class="mb-2.5">
                 <input id="adminEventSearch" type="text" placeholder="🔍 Search events..."
+                  aria-label="Search events in admin list"
                   class="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   oninput="debouncedAdminSearch(this.value)" />
               </div>
@@ -680,13 +663,13 @@
         </div>
         <div class="space-y-3 pt-2">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
+            <label for="cpFullName" class="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
             <input id="cpFullName" type="text"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               placeholder="e.g. Rahul Sharma" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
+            <label for="cpRollNumber" class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
             <input id="cpRollNumber" type="text"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono uppercase"
               placeholder="e.g. 21A91A05G1" />
@@ -716,7 +699,7 @@
         </div>
         <div class="space-y-3 pt-2">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Registered College Email</label>
+            <label for="fpEmail" class="block text-xs font-medium text-slate-600 mb-1">Registered College Email</label>
             <input id="fpEmail" type="email"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               placeholder="your@email.com" />
@@ -744,21 +727,21 @@
         </div>
         <div class="space-y-3 pt-2">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">New Password</label>
+            <label for="npNewPass" class="block text-xs font-medium text-slate-600 mb-1">New Password</label>
             <div class="relative">
               <input id="npNewPass" type="password"
                 class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 placeholder="Minimum 6 characters" />
-              <button type="button" onclick="togglePasswordVisibility('npNewPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+              <button type="button" onclick="togglePasswordVisibility('npNewPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password" aria-label="Toggle password visibility">👁️</button>
             </div>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Confirm New Password</label>
+            <label for="npConfirmPass" class="block text-xs font-medium text-slate-600 mb-1">Confirm New Password</label>
             <div class="relative">
               <input id="npConfirmPass" type="password"
                 class="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 placeholder="Repeat new password" />
-              <button type="button" onclick="togglePasswordVisibility('npConfirmPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password">👁️</button>
+              <button type="button" onclick="togglePasswordVisibility('npConfirmPass', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 text-sm focus:outline-none" title="Show/Hide password" aria-label="Toggle password visibility">👁️</button>
             </div>
           </div>
           <div id="npMsg" class="text-xs font-medium"></div>
@@ -781,29 +764,29 @@
         <input type="hidden" id="editEvId" />
         <div class="space-y-3 text-xs">
           <div>
-            <label class="block font-medium text-slate-700 mb-1">Event Title</label>
+            <label for="editEvTitle" class="block font-medium text-slate-700 mb-1">Event Title</label>
             <input id="editEvTitle" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block font-medium text-slate-700 mb-1">Date</label>
+              <label for="editEvDate" class="block font-medium text-slate-700 mb-1">Date</label>
               <input id="editEvDate" type="date" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
             </div>
             <div>
-              <label class="block font-medium text-slate-700 mb-1">Time</label>
+              <label for="editEvTime" class="block font-medium text-slate-700 mb-1">Time</label>
               <input id="editEvTime" type="time" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
             </div>
           </div>
           <div>
-            <label class="block font-medium text-slate-700 mb-1">Venue</label>
+            <label for="editEvVenue" class="block font-medium text-slate-700 mb-1">Venue</label>
             <input id="editEvVenue" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
           </div>
           <div>
-            <label class="block font-medium text-slate-700 mb-1">Capacity (Max Attendees)</label>
+            <label for="editEvCapacity" class="block font-medium text-slate-700 mb-1">Capacity (Max Attendees)</label>
             <input id="editEvCapacity" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs" />
           </div>
           <div>
-            <label class="block font-medium text-slate-700 mb-1">Description & Guidelines</label>
+            <label for="editEvDesc" class="block font-medium text-slate-700 mb-1">Description & Guidelines</label>
             <textarea id="editEvDesc" rows="3" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs"></textarea>
           </div>
           <div id="editEvMsg" class="text-xs font-medium"></div>

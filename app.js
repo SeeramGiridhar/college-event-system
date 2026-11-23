@@ -9,35 +9,12 @@ let attendanceChartInstance = null;
 let currentVerifiedAttendee = null;
 let html5QrScanner = null;
 let isScannerActive = false;
+let _cameraStarting = false;
+let _cameraCancelled = false;
 let studentSearchQuery = '';
 let adminSearchQuery = '';
-
-// Dynamic script loader for on-demand lazy loading (Chart.js, html5-qrcode)
-
-// Render QR code reliably with automatic retry if library is initializing
-function renderQrCodeSafely(elementId, text) {
-  if (!text) return;
-  const tryRender = () => {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    if (window.QRCode) {
-      el.innerHTML = '';
-      try {
-        new QRCode(el, {
-          text: String(text).trim(),
-          width: 76,
-          height: 76,
-          correctLevel: QRCode.CorrectLevel.M
-        });
-      } catch (err) {
-        console.warn('QR code generation error:', err);
-      }
-    } else {
-      setTimeout(tryRender, 100);
-    }
-  };
-  setTimeout(tryRender, 60);
-}
+let _cachedStudentEvents = null;
+let _lastActiveElement = null;
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -50,6 +27,34 @@ function loadScript(src) {
   });
 }
 
+// Render QR code reliably with on-demand lazy loading of qrcodejs
+async function renderQrCodeSafely(elementId, text) {
+  if (!text) return;
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  if (!window.QRCode) {
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js');
+    } catch (err) {
+      console.warn('QR library load error:', err);
+      el.innerHTML = '<span class="text-[9px] text-slate-400">QR unavailable</span>';
+      return;
+    }
+  }
+
+  el.innerHTML = '';
+  try {
+    new QRCode(el, {
+      text: String(text).trim(),
+      width: 76,
+      height: 76,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch (err) {
+    console.warn('QR code generation error:', err);
+  }
+}
 
 // ============================================================================
 // CLOCK & BASIC UI UTILITIES
@@ -60,10 +65,16 @@ function togglePasswordVisibility(inputId, btn) {
   if (!input) return;
   if (input.type === 'password') {
     input.type = 'text';
-    if (btn) btn.textContent = '🙈';
+    if (btn) {
+      btn.textContent = '🙈';
+      btn.setAttribute('aria-label', 'Hide password');
+    }
   } else {
     input.type = 'password';
-    if (btn) btn.textContent = '👁️';
+    if (btn) {
+      btn.textContent = '👁️';
+      btn.setAttribute('aria-label', 'Show password');
+    }
   }
 }
 
@@ -404,16 +415,22 @@ async function handleSaveCompleteProfile() {
   }
 }
 
-// Forgot Password Flow (Supabase resetPasswordForEmail)
+// Forgot Password Flow
 function toggleForgotPasswordModal(show) {
   const modal = document.getElementById('forgotPasswordModal');
   if (!modal) return;
   if (show) {
+    _lastActiveElement = document.activeElement;
     modal.classList.remove('hidden');
     document.getElementById('fpEmail').value = '';
     document.getElementById('fpMsg').textContent = '';
+    setTimeout(() => document.getElementById('fpEmail')?.focus(), 50);
   } else {
     modal.classList.add('hidden');
+    if (_lastActiveElement) {
+      _lastActiveElement.focus();
+      _lastActiveElement = null;
+    }
   }
 }
 
@@ -442,20 +459,28 @@ async function handleForgotPasswordSubmit() {
   }
 }
 
-// Reset Password Modal (when arriving from Supabase reset link)
+// Reset Password Modal
 function openResetPasswordModal() {
   const modal = document.getElementById('resetPasswordModal');
   if (modal) {
+    _lastActiveElement = document.activeElement;
     modal.classList.remove('hidden');
     document.getElementById('npNewPass').value = '';
     document.getElementById('npConfirmPass').value = '';
     document.getElementById('npMsg').textContent = '';
+    setTimeout(() => document.getElementById('npNewPass')?.focus(), 50);
   }
 }
 
 function closeResetPasswordModal() {
   const modal = document.getElementById('resetPasswordModal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    if (_lastActiveElement) {
+      _lastActiveElement.focus();
+      _lastActiveElement = null;
+    }
+  }
 }
 
 async function handleUpdatePasswordSubmit() {
@@ -610,16 +635,21 @@ async function renderStudentDashboard() {
 
 const debouncedStudentSearch = debounce((val) => {
   studentSearchQuery = (val || '').toLowerCase().trim();
-  renderStudentEvents();
+  renderStudentEvents(false);
 }, 300);
 
-async function renderStudentEvents() {
+async function renderStudentEvents(forceReload = false) {
   const container = document.getElementById('studentEventsList');
   const countBadge = document.getElementById('eventCountBadge');
-  renderSkeletonCards(container, 2);
+  if (forceReload || !_cachedStudentEvents) {
+    renderSkeletonCards(container, 2);
+  }
 
   try {
-    const events = await apiFetchEventsWithCounts();
+    if (forceReload || !_cachedStudentEvents) {
+      _cachedStudentEvents = await apiFetchEventsWithCounts();
+    }
+    const events = _cachedStudentEvents || [];
     let filtered = events;
     if (studentSearchQuery) {
       filtered = events.filter(e =>
@@ -639,6 +669,7 @@ async function renderStudentEvents() {
 
     filtered.forEach(ev => {
       const isRegistered = !!ev.my_entry_code;
+      const isExpired = !!ev.is_expired;
       const isFull = !!ev.is_full;
       const seatsLeft = ev.seats_left !== undefined ? ev.seats_left : Math.max(0, ev.capacity - (ev.registered || 0));
 
@@ -651,9 +682,11 @@ async function renderStudentEvents() {
             <h4 class="text-sm font-bold text-slate-900">${escapeHtml(ev.title)}</h4>
             ${isRegistered
               ? '<span class="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full shrink-0">Registered</span>'
-              : (isFull
-                ? '<span class="text-[11px] font-semibold bg-rose-100 text-rose-700 px-2.5 py-0.5 rounded-full shrink-0">Event Full</span>'
-                : `<span class="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full shrink-0">${seatsLeft} seats left</span>`)
+              : (isExpired
+                ? '<span class="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full shrink-0">Registration Closed</span>'
+                : (isFull
+                  ? '<span class="text-[11px] font-semibold bg-rose-100 text-rose-700 px-2.5 py-0.5 rounded-full shrink-0">Event Full</span>'
+                  : `<span class="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full shrink-0">${seatsLeft} seats left</span>`))
             }
           </div>
           <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHtml(ev.description || 'No description provided.')}</p>
@@ -668,14 +701,18 @@ async function renderStudentEvents() {
           <div class="text-xs font-medium text-slate-600">
             ${isRegistered
               ? `<span class="text-emerald-700 font-mono font-bold">Pass: ${escapeHtml(ev.my_entry_code)}</span>`
-              : (isFull ? '<span class="text-rose-600">No seats remaining</span>' : '<span class="text-slate-500">Free Registration</span>')}
+              : (isExpired
+                ? '<span class="text-slate-500">Event date/time passed</span>'
+                : (isFull ? '<span class="text-rose-600">No seats remaining</span>' : '<span class="text-slate-500">Free Registration</span>'))}
           </div>
           <div>
             ${isRegistered
               ? '<button disabled class="px-3 py-1.5 bg-slate-100 text-slate-400 font-semibold rounded-lg text-xs cursor-not-allowed">Registered</button>'
-              : (isFull
-                ? '<button disabled class="px-3 py-1.5 bg-slate-100 text-slate-400 font-semibold rounded-lg text-xs cursor-not-allowed">Full</button>'
-                : `<button onclick="handleStudentRegisterForEvent('${ev.id}', this)" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-all shadow-sm">Register</button>`)
+              : (isExpired
+                ? '<button disabled class="px-3 py-1.5 bg-slate-100 text-slate-400 font-semibold rounded-lg text-xs cursor-not-allowed">Closed</button>'
+                : (isFull
+                  ? '<button disabled class="px-3 py-1.5 bg-slate-100 text-slate-400 font-semibold rounded-lg text-xs cursor-not-allowed">Full</button>'
+                  : `<button onclick="handleStudentRegisterForEvent('${ev.id}', this)" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-all shadow-sm">Register</button>`))
             }
           </div>
         </div>
@@ -697,8 +734,9 @@ async function handleStudentRegisterForEvent(eventId, btn = null) {
   try {
     const entryCode = await apiRegisterForEvent(eventId);
     showModal('Registration Confirmed! 🎉', `You have successfully registered for the event. Your unique gate entry code is: ${entryCode}. You can find your pass and QR code in "My Registrations".`, 'success');
+    _cachedStudentEvents = null;
     await Promise.all([
-      renderStudentEvents(),
+      renderStudentEvents(true),
       renderStudentMyRegistrations()
     ]);
   } catch (err) {
@@ -706,11 +744,13 @@ async function handleStudentRegisterForEvent(eventId, btn = null) {
     let msg = err.message || 'Registration failed.';
     if (msg.includes('ALREADY_REGISTERED')) {
       msg = 'You are already registered for this event.';
+    } else if (msg.includes('EVENT_EXPIRED')) {
+      msg = 'Registration is closed for this event as the event date/time has passed.';
     } else if (msg.includes('EVENT_FULL')) {
       msg = 'Sorry! This event has just reached maximum capacity.';
     }
     showModal('Registration Notice', msg, 'error');
-    renderStudentEvents();
+    renderStudentEvents(true);
   }
 }
 
@@ -807,6 +847,7 @@ async function renderAdminDashboard() {
 const debouncedAdminSearch = debounce((val) => {
   adminSearchQuery = (val || '').toLowerCase().trim();
   renderAdminEventsList();
+  renderAdminEventSummaryTable();
 }, 300);
 
 async function renderAdminEventsList(preloadedEvents = null) {
@@ -869,11 +910,23 @@ async function handleCreateEvent() {
   const time = document.getElementById('evTime').value;
   const venue = document.getElementById('evVenue').value.trim();
   const desc = document.getElementById('evDesc').value.trim();
-  const cap = parseInt(document.getElementById('evCapacity')?.value, 10) || 100;
+  const capRaw = document.getElementById('evCapacity')?.value?.trim();
   const msgEl = document.getElementById('eventMsg');
 
   if (!title || !date || !venue) {
     msgEl.textContent = 'Please provide event title, date, and venue.';
+    msgEl.className = 'mt-2 text-xs font-medium text-rose-600';
+    return;
+  }
+
+  if (!capRaw || !/^\d+$/.test(capRaw)) {
+    msgEl.textContent = 'Event capacity must be a valid whole number (no fractions or decimals).';
+    msgEl.className = 'mt-2 text-xs font-medium text-rose-600';
+    return;
+  }
+  const cap = parseInt(capRaw, 10);
+  if (cap <= 0 || cap > 100000) {
+    msgEl.textContent = 'Event capacity must be greater than 0 (maximum 100,000).';
     msgEl.className = 'mt-2 text-xs font-medium text-rose-600';
     return;
   }
@@ -947,12 +1000,32 @@ async function handleSaveEditEvent() {
   const date = document.getElementById('editEvDate').value;
   const time = document.getElementById('editEvTime').value;
   const venue = document.getElementById('editEvVenue').value.trim();
-  const capacity = parseInt(document.getElementById('editEvCapacity').value, 10);
+  const capRaw = document.getElementById('editEvCapacity')?.value?.trim();
   const desc = document.getElementById('editEvDesc').value.trim();
   const msgEl = document.getElementById('editEvMsg');
 
-  if (!title || !date || !venue || capacity < 1) {
+  if (!title || !date || !venue) {
     msgEl.textContent = 'Please fill all required fields properly.';
+    msgEl.className = 'text-xs font-medium text-rose-600';
+    return;
+  }
+
+  if (!capRaw || !/^\d+$/.test(capRaw)) {
+    msgEl.textContent = 'Capacity must be a valid whole number (no fractions or decimals).';
+    msgEl.className = 'text-xs font-medium text-rose-600';
+    return;
+  }
+  const capacity = parseInt(capRaw, 10);
+  if (capacity <= 0 || capacity > 100000) {
+    msgEl.textContent = 'Capacity must be greater than 0 (maximum 100,000).';
+    msgEl.className = 'text-xs font-medium text-rose-600';
+    return;
+  }
+
+  const currentEv = await apiFetchEventById(id);
+  const confirmedCount = currentEv?.registeredCount || 0;
+  if (capacity < confirmedCount) {
+    msgEl.textContent = `Capacity cannot be lower than confirmed bookings (${confirmedCount}).`;
     msgEl.className = 'text-xs font-medium text-rose-600';
     return;
   }
@@ -1110,28 +1183,37 @@ async function toggleCameraScanner() {
   const container = document.getElementById('qrScannerContainer');
   const btn = document.getElementById('btnToggleScanner');
 
-  if (isScannerActive) {
+  if (isScannerActive || _cameraStarting) {
     stopCameraScanner();
-  } else {
-    container.classList.remove('hidden');
-    btn.textContent = '⏳ Starting Camera...';
-    btn.className = 'px-3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
-    isScannerActive = true;
+    return;
+  }
 
-    if (!window.Html5Qrcode) {
-      try {
-        await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
-      } catch (err) {
-        showModal('Scanner Error', 'Failed to load camera scanner library. Please check your network.', 'error');
-        stopCameraScanner();
-        return;
-      }
+  container.classList.remove('hidden');
+  btn.textContent = '⏳ Starting Camera...';
+  btn.className = 'px-3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
+  _cameraStarting = true;
+  _cameraCancelled = false;
+
+  if (!window.Html5Qrcode) {
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
+    } catch (err) {
+      _cameraStarting = false;
+      showModal('Scanner Error', 'Failed to load camera scanner library. Please check your network.', 'error');
+      stopCameraScanner();
+      return;
     }
-    btn.textContent = '⏹️ Stop Camera';
-    btn.className = 'px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
+  }
 
+  if (_cameraCancelled) {
+    _cameraStarting = false;
+    stopCameraScanner();
+    return;
+  }
+
+  try {
     html5QrScanner = new Html5Qrcode('qrReader');
-    html5QrScanner.start(
+    await html5QrScanner.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 220, height: 220 } },
       (decodedText) => {
@@ -1139,26 +1221,57 @@ async function toggleCameraScanner() {
         document.getElementById('entryCodeInput').value = decodedText.trim().toUpperCase();
         handleVerifyEntryCode(decodedText.trim().toUpperCase());
       },
-      (error) => {
-        // Scanning frame without QR; no action needed
-      }
-    ).catch(err => {
+      () => {}
+    );
+
+    _cameraStarting = false;
+    if (_cameraCancelled) {
+      stopCameraScanner();
+      return;
+    }
+
+    isScannerActive = true;
+    btn.textContent = '⏹️ Stop Camera';
+    btn.className = 'px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
+  } catch (err) {
+    _cameraStarting = false;
+    if (!_cameraCancelled) {
       console.error('Camera start error:', err);
       showModal('Camera Access Denied', 'Camera permission was denied or camera is unavailable. Please check your browser camera settings or type the entry code manually.', 'error');
-      stopCameraScanner();
-    });
+    }
+    stopCameraScanner();
   }
 }
 
 function stopCameraScanner() {
+  _cameraCancelled = true;
+  _cameraStarting = false;
   const container = document.getElementById('qrScannerContainer');
   const btn = document.getElementById('btnToggleScanner');
-  if (html5QrScanner && isScannerActive) {
-    html5QrScanner.stop().then(() => {
-      html5QrScanner.clear();
-      html5QrScanner = null;
-    }).catch(e => console.warn(e));
+
+  if (html5QrScanner) {
+    const scanner = html5QrScanner;
+    html5QrScanner = null;
+    try {
+      if (scanner.isScanning) {
+        scanner.stop().then(() => scanner.clear()).catch(e => console.warn(e));
+      } else {
+        scanner.clear();
+      }
+    } catch (e) {
+      console.warn(e);
+    }
   }
+
+  // Explicitly close any active media tracks in video elements
+  const videoEl = document.querySelector('#qrReader video');
+  if (videoEl && videoEl.srcObject) {
+    try {
+      videoEl.srcObject.getTracks().forEach(t => t.stop());
+    } catch (e) {}
+    videoEl.srcObject = null;
+  }
+
   isScannerActive = false;
   if (container) container.classList.add('hidden');
   if (btn) {
@@ -1243,10 +1356,13 @@ async function renderAdminEventSummaryTable(preloadedEvents = null, preloadedReg
       : await Promise.all([apiFetchEventsAdmin(), apiGetAllRegistrationsAdmin()]);
 
     tbody.innerHTML = '';
-    if (events.length === 0) {
+    if (events.length === 0 && regs.length === 0) {
       tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-400">No events created yet</td></tr>';
       return;
     }
+
+    const activeEventIds = new Set(events.map(ev => ev.id));
+    const orphanedRegs = regs.filter(r => !activeEventIds.has(r.event_id));
 
     events.forEach(ev => {
       const evRegs = regs.filter(r => r.event_id === ev.id);
@@ -1262,6 +1378,18 @@ async function renderAdminEventSummaryTable(preloadedEvents = null, preloadedReg
       `;
       tbody.appendChild(tr);
     });
+
+    if (orphanedRegs.length > 0) {
+      const orphanEntered = orphanedRegs.filter(r => r.entered).length;
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50/80 bg-slate-50/50 text-slate-500';
+      tr.innerHTML = `
+        <td class="p-2.5 font-medium italic text-slate-600">📦 Archived / Deleted Events</td>
+        <td class="p-2.5 text-center font-semibold text-slate-700">${orphanedRegs.length}</td>
+        <td class="p-2.5 text-center font-semibold text-emerald-700">${orphanEntered}</td>
+      `;
+      tbody.appendChild(tr);
+    }
   } catch (err) {
     console.error('Render summary table error:', err);
   }
@@ -1354,15 +1482,42 @@ function setupKeyboardShortcuts() {
   onEnter('cpRollNumber', handleSaveCompleteProfile);
   onEnter('fpEmail', handleForgotPasswordSubmit);
   onEnter('npConfirmPass', handleUpdatePasswordSubmit);
-  onEnter('studentSearch', () => {
-    const val = document.getElementById('studentSearch')?.value;
+  onEnter('studentEventSearch', () => {
+    const val = document.getElementById('studentEventSearch')?.value;
     studentSearchQuery = (val || '').toLowerCase().trim();
-    renderStudentEvents();
+    renderStudentEvents(false);
   });
-  onEnter('adminSearch', () => {
-    const val = document.getElementById('adminSearch')?.value;
+  onEnter('adminEventSearch', () => {
+    const val = document.getElementById('adminEventSearch')?.value;
     adminSearchQuery = (val || '').toLowerCase().trim();
     renderAdminEventsList();
+    renderAdminEventSummaryTable();
+  });
+
+  // Global Escape Key Listener for Accessible Dialog Dismissal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const forgotModal = document.getElementById('forgotPasswordModal');
+      if (forgotModal && !forgotModal.classList.contains('hidden')) {
+        toggleForgotPasswordModal(false);
+        return;
+      }
+      const resetModal = document.getElementById('resetPasswordModal');
+      if (resetModal && !resetModal.classList.contains('hidden')) {
+        closeResetPasswordModal();
+        return;
+      }
+      const editModal = document.getElementById('editEventModal');
+      if (editModal && !editModal.classList.contains('hidden')) {
+        closeEditEventModal();
+        return;
+      }
+      const customModal = document.getElementById('customModal');
+      if (customModal && !customModal.classList.contains('hidden')) {
+        closeModal();
+        return;
+      }
+    }
   });
 }
 
@@ -1388,6 +1543,7 @@ function setupKeyboardShortcuts() {
       }
 
       if (activePortal === 'admin' && role === 'admin') {
+        switchWindow('admin');
         toggleAdminDashboardView(true);
         switchStudentSub('login');
       } else {
@@ -1403,15 +1559,17 @@ function setupKeyboardShortcuts() {
       // Start real-time listeners (onSnapshot) for events & registrations
       setupRealtime({
         onEventsChange: () => {
+          _cachedStudentEvents = null;
           if (!document.getElementById('studentWindow').classList.contains('hidden')) {
-            renderStudentEvents();
+            renderStudentEvents(true);
           } else {
             renderAdminDashboard();
           }
         },
         onRegsChange: () => {
+          _cachedStudentEvents = null;
           if (!document.getElementById('studentWindow').classList.contains('hidden')) {
-            renderStudentEvents();
+            renderStudentEvents(true);
             renderStudentMyRegistrations();
           } else {
             renderAdminStats();

@@ -73,6 +73,36 @@ function escapeHtml(v) {
                         .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// ─── Timezone-aware Event Expiry Check (Asia/Kolkata) ────────────────────────
+function isEventExpired(dateStr, timeStr) {
+  if (!dateStr) return false;
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const p = {};
+    parts.forEach(({ type, value }) => { p[type] = value; });
+    const currentIstIso = `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
+
+    const t = (timeStr && timeStr.trim()) ? timeStr.trim() : '23:59:59';
+    const timeParts = t.split(':');
+    const hh = String(timeParts[0] || '00').padStart(2, '0');
+    const mm = String(timeParts[1] || '00').padStart(2, '0');
+    const ss = String(timeParts[2] || '00').padStart(2, '0');
+    const eventIso = `${dateStr.trim()}T${hh}:${mm}:${ss}`;
+
+    return eventIso < currentIstIso;
+  } catch (err) {
+    console.warn('isEventExpired error:', err);
+    return false;
+  }
+}
+
 // ─── Helper: generate 8-char uppercase entry code (crypto-safe) ──────────────
 const _CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 function _genCode() {
@@ -233,6 +263,7 @@ function _shapeEvent(doc) {
     category:    d.category || '',
     status:      d.status || 'unpublished',
     registeredCount: d.registeredCount || 0,
+    is_expired:  isEventExpired(d.date, d.time),
     createdAt:   d.createdAt,
     createdBy:   d.createdBy || ''
   };
@@ -394,14 +425,19 @@ async function apiRegisterForEvent(eventId) {
     try {
       await _db.runTransaction(async tx => {
         const evDoc   = await tx.get(evRef);
-        const regDoc  = await tx.get(regRef);
         const codeDoc = await tx.get(codeRef);
 
         if (!evDoc.exists) throw new Error('Event not found.');
-        if (regDoc.exists) throw new Error('ALREADY_REGISTERED');
+        const evData = evDoc.data();
+
+        // Enforce registration deadline in Asia/Kolkata timezone
+        if (isEventExpired(evData.date, evData.time)) {
+          throw new Error('EVENT_EXPIRED');
+        }
+
         if (codeDoc.exists) throw new Error('CODE_COLLISION');
 
-        const { capacity, registeredCount = 0 } = evDoc.data();
+        const { capacity = 100, registeredCount = 0 } = evData;
         if (registeredCount >= capacity) throw new Error('EVENT_FULL');
 
         tx.set(regRef, {
