@@ -12,6 +12,19 @@ let isScannerActive = false;
 let studentSearchQuery = '';
 let adminSearchQuery = '';
 
+// Dynamic script loader for on-demand lazy loading (Chart.js, html5-qrcode)
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load script: ' + src));
+    document.head.appendChild(script);
+  });
+}
+
+
 // ============================================================================
 // CLOCK & BASIC UI UTILITIES
 // ============================================================================
@@ -85,6 +98,7 @@ function renderSkeletonCards(container, count = 2) {
 // PORTAL & SUB-WINDOW SWITCHING
 // ============================================================================
 function switchWindow(windowName) {
+  stopCameraScanner();
   const studentWin = document.getElementById('studentWindow');
   const adminWin = document.getElementById('adminWindow');
   const studentBtn = document.getElementById('tabStudentBtn');
@@ -324,7 +338,13 @@ function openCompleteProfileModal() {
   if (modal) modal.classList.remove('hidden');
 }
 
-function closeCompleteProfileModal() {
+async function closeCompleteProfileModal() {
+  const profile = await getMyProfile();
+  if (!profile || !profile.roll_number || !profile.roll_number.trim()) {
+    showModal('Profile Required', 'Please complete your student profile (name & roll number) to access events. Logging you out.', 'error');
+    setTimeout(() => handleStudentLogout(), 1200);
+    return;
+  }
   const modal = document.getElementById('completeProfileModal');
   if (modal) modal.classList.add('hidden');
 }
@@ -535,6 +555,7 @@ function clearAdminLogin() {
 }
 
 async function handleAdminLogout() {
+  stopCameraScanner();
   sessionStorage.removeItem('cem_active_portal');
   await authSignOut();
   toggleAdminDashboardView(false);
@@ -682,8 +703,16 @@ async function renderStudentMyRegistrations() {
       return;
     }
 
+    // Batch fetch event details to eliminate N+1 sequential queries
+    const uniqueIds = [...new Set(regs.map(r => r.event_id))];
+    const eventObjects = await Promise.all(uniqueIds.map(id => apiFetchEventById(id)));
+    const eventMap = {};
+    uniqueIds.forEach((id, i) => {
+      eventMap[id] = eventObjects[i] || { title: 'College Event', date: '', venue: '' };
+    });
+
     for (const r of regs) {
-      const event = await apiFetchEventById(r.event_id) || { title: 'College Event', date: '', venue: '' };
+      const event = eventMap[r.event_id] || { title: 'College Event', date: '', venue: '' };
       const card = document.createElement('div');
       card.className = 'p-4 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4';
 
@@ -737,12 +766,22 @@ async function renderStudentMyRegistrations() {
 // ADMIN DASHBOARD & CONTROLS
 // ============================================================================
 async function renderAdminDashboard() {
-  await Promise.all([
-    renderAdminEventsList(),
-    renderAdminStats(),
-    renderAdminEventSummaryTable(),
-    renderAdminAllRegistrationsList()
-  ]);
+  try {
+    // Single consolidated fetch to eliminate duplicate queries across sub-components
+    const [events, regs, profiles] = await Promise.all([
+      apiFetchEventsAdmin(adminSearchQuery),
+      apiGetAllRegistrationsAdmin(),
+      apiGetAllProfilesAdmin()
+    ]);
+    await Promise.all([
+      renderAdminEventsList(events),
+      renderAdminStats(events, regs),
+      renderAdminEventSummaryTable(events, regs),
+      renderAdminAllRegistrationsList(regs, profiles, events)
+    ]);
+  } catch (err) {
+    console.error('Render admin dashboard error:', err);
+  }
 }
 
 const debouncedAdminSearch = debounce((val) => {
@@ -750,12 +789,12 @@ const debouncedAdminSearch = debounce((val) => {
   renderAdminEventsList();
 }, 300);
 
-async function renderAdminEventsList() {
+async function renderAdminEventsList(preloadedEvents = null) {
   const container = document.getElementById('adminEventsList');
-  renderSkeletonCards(container, 2);
+  if (!preloadedEvents) renderSkeletonCards(container, 2);
 
   try {
-    const events = await apiFetchEventsAdmin(adminSearchQuery);
+    const events = preloadedEvents !== null ? preloadedEvents : await apiFetchEventsAdmin(adminSearchQuery);
     container.innerHTML = '';
 
     if (events.length === 0) {
@@ -815,6 +854,13 @@ async function handleCreateEvent() {
 
   if (!title || !date || !venue) {
     msgEl.textContent = 'Please provide event title, date, and venue.';
+    msgEl.className = 'mt-2 text-xs font-medium text-rose-600';
+    return;
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (date < todayStr) {
+    msgEl.textContent = 'Event date cannot be in the past.';
     msgEl.className = 'mt-2 text-xs font-medium text-rose-600';
     return;
   }
@@ -975,17 +1021,24 @@ async function handleVerifyEntryCode(codeOverride = null) {
         <div class="text-xs text-slate-600 space-y-0.5 pt-2 border-t border-slate-200/60">
           <div><b>Event:</b> ${escapeHtml(attendee.event_title)}</div>
           <div><b>Venue:</b> ${escapeHtml(attendee.event_venue || 'Main Hall')} · <b>Date:</b> ${escapeHtml(attendee.event_date)}</div>
-          ${isEntered ? `<div class="text-amber-800 font-semibold pt-1">⚠️ Admitted at: ${new Date(attendee.entered_at).toLocaleTimeString()}</div>` : ''}
+          ${isEntered ? `<div class="text-amber-800 font-semibold pt-1">⚠️ Admitted at: ${attendee.entered_at ? new Date(attendee.entered_at).toLocaleTimeString() : 'Recorded'}</div>` : ''}
         </div>
         ${!isEntered ? `
           <div class="pt-2">
-            <button onclick="handleMarkAttendeeEntered('${escapeHtml(attendee.entry_code)}')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md">
+            <button id="btnAdmitAttendeeSubmit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md">
               ✓ Mark ENTERED (Grant Gate Access)
             </button>
           </div>
         ` : ''}
       </div>
     `;
+
+    if (!isEntered) {
+      const admitBtn = resultContainer.querySelector('#btnAdmitAttendeeSubmit');
+      if (admitBtn) {
+        admitBtn.addEventListener('click', () => handleMarkAttendeeEntered(attendee.entry_code));
+      }
+    }
   } catch (err) {
     console.error('Verify entry error:', err);
     msgEl.textContent = err.message || 'Verification failed.';
@@ -1033,7 +1086,7 @@ function clearEntryVerification() {
 }
 
 // Camera Scanner with html5-qrcode
-function toggleCameraScanner() {
+async function toggleCameraScanner() {
   const container = document.getElementById('qrScannerContainer');
   const btn = document.getElementById('btnToggleScanner');
 
@@ -1041,15 +1094,21 @@ function toggleCameraScanner() {
     stopCameraScanner();
   } else {
     container.classList.remove('hidden');
-    btn.textContent = '⏹️ Stop Camera';
-    btn.className = 'px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
+    btn.textContent = '⏳ Starting Camera...';
+    btn.className = 'px-3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
     isScannerActive = true;
 
     if (!window.Html5Qrcode) {
-      showModal('Scanner Library Missing', 'HTML5 QR Code library is loading. Please try again.', 'error');
-      stopCameraScanner();
-      return;
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
+      } catch (err) {
+        showModal('Scanner Error', 'Failed to load camera scanner library. Please check your network.', 'error');
+        stopCameraScanner();
+        return;
+      }
     }
+    btn.textContent = '⏹️ Stop Camera';
+    btn.className = 'px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5';
 
     html5QrScanner = new Html5Qrcode('qrReader');
     html5QrScanner.start(
@@ -1091,13 +1150,12 @@ function stopCameraScanner() {
 // ============================================================================
 // ADMIN ANALYTICS, PIE CHART, PER-EVENT TABLE & AUDIT LOG
 // ============================================================================
-async function renderAdminStats() {
+async function renderAdminStats(preloadedEvents = null, preloadedRegs = null) {
   const pillsContainer = document.getElementById('adminStatsPills');
   try {
-    const [events, regs] = await Promise.all([
-      apiFetchEventsAdmin(),
-      apiGetAllRegistrationsAdmin()
-    ]);
+    const [events, regs] = (preloadedEvents !== null && preloadedRegs !== null)
+      ? [preloadedEvents, preloadedRegs]
+      : await Promise.all([apiFetchEventsAdmin(), apiGetAllRegistrationsAdmin()]);
 
     const totalEvents = events.length;
     const totalRegs = regs.length;
@@ -1120,7 +1178,11 @@ async function renderAdminStats() {
     `;
 
     const canvas = document.getElementById('attendancePieChart');
-    if (!canvas || !window.Chart) return;
+    if (!canvas) return;
+    if (!window.Chart) {
+      await loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js');
+    }
+    if (!window.Chart) return;
     const ctx = canvas.getContext('2d');
     if (attendanceChartInstance) {
       attendanceChartInstance.destroy();
@@ -1153,13 +1215,12 @@ async function renderAdminStats() {
   }
 }
 
-async function renderAdminEventSummaryTable() {
+async function renderAdminEventSummaryTable(preloadedEvents = null, preloadedRegs = null) {
   const tbody = document.getElementById('adminEventSummaryTableBody');
   try {
-    const [events, regs] = await Promise.all([
-      apiFetchEventsAdmin(),
-      apiGetAllRegistrationsAdmin()
-    ]);
+    const [events, regs] = (preloadedEvents !== null && preloadedRegs !== null)
+      ? [preloadedEvents, preloadedRegs]
+      : await Promise.all([apiFetchEventsAdmin(), apiGetAllRegistrationsAdmin()]);
 
     tbody.innerHTML = '';
     if (events.length === 0) {
@@ -1186,16 +1247,18 @@ async function renderAdminEventSummaryTable() {
   }
 }
 
-async function renderAdminAllRegistrationsList() {
+async function renderAdminAllRegistrationsList(preloadedRegs = null, preloadedProfiles = null, preloadedEvents = null) {
   const listEl = document.getElementById('adminAllRegsList');
   const badgeEl = document.getElementById('adminTotalRegsBadge');
 
   try {
-    const [regs, profiles, events] = await Promise.all([
-      apiGetAllRegistrationsAdmin(),
-      apiGetAllProfilesAdmin(),
-      apiFetchEventsAdmin()
-    ]);
+    const [regs, profiles, events] = (preloadedRegs !== null && preloadedProfiles !== null && preloadedEvents !== null)
+      ? [preloadedRegs, preloadedProfiles, preloadedEvents]
+      : await Promise.all([
+          apiGetAllRegistrationsAdmin(),
+          apiGetAllProfilesAdmin(),
+          apiFetchEventsAdmin()
+        ]);
 
     badgeEl.textContent = `${regs.length} Records`;
     listEl.innerHTML = '';
@@ -1221,7 +1284,7 @@ async function renderAdminAllRegistrationsList() {
               ? '<span class="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Entered</span>'
               : '<span class="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pending</span>'}
           </div>
-          <p class="text-[11px] text-slate-500 mt-0.5">Event: <b class="text-slate-700">${escapeHtml(ev.title)}</b> · Reg: ${new Date(r.created_at).toLocaleDateString()}</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">Event: <b class="text-slate-700">${escapeHtml(ev.title)}</b> · Reg: ${r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Recent'}</p>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <div class="text-right">
@@ -1240,9 +1303,53 @@ async function renderAdminAllRegistrationsList() {
 
 
 // ============================================================================
+
+// Setup keyboard Enter key support for all inputs & handheld barcode/QR scanners
+function setupKeyboardShortcuts() {
+  const onEnter = (id, fn) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        fn();
+      }
+    });
+  };
+
+  onEnter('loginPass', handleStudentLogin);
+  onEnter('loginEmail', () => {
+    const pass = document.getElementById('loginPass');
+    if (pass && !pass.value) pass.focus();
+    else handleStudentLogin();
+  });
+  onEnter('regPass', handleStudentRegister);
+  onEnter('adminPass', handleAdminLogin);
+  onEnter('adminEmail', () => {
+    const pass = document.getElementById('adminPass');
+    if (pass && !pass.value) pass.focus();
+    else handleAdminLogin();
+  });
+  onEnter('entryCodeInput', () => handleVerifyEntryCode());
+  onEnter('cpRollNumber', handleSaveCompleteProfile);
+  onEnter('fpEmail', handleForgotPasswordSubmit);
+  onEnter('npConfirmPass', handleUpdatePasswordSubmit);
+  onEnter('studentSearch', () => {
+    const val = document.getElementById('studentSearch')?.value;
+    studentSearchQuery = (val || '').toLowerCase().trim();
+    renderStudentEvents();
+  });
+  onEnter('adminSearch', () => {
+    const val = document.getElementById('adminSearch')?.value;
+    adminSearchQuery = (val || '').toLowerCase().trim();
+    renderAdminEventsList();
+  });
+}
+
 // SYSTEM BOOTSTRAP & AUTH STATE LISTENER (Firebase)
 // ============================================================================
 (function initSystem() {
+  setupKeyboardShortcuts();
   // Firebase onAuthStateChanged fires on every page load and login/logout
   firebase.auth().onAuthStateChanged(async (user) => {
     if (user) {
@@ -1265,7 +1372,12 @@ async function renderAdminAllRegistrationsList() {
         switchStudentSub('login');
       } else {
         toggleAdminDashboardView(false);
-        switchStudentSub('dashboard');
+        // Enforce roll number completion for Google OAuth users even after reload
+        if (!profile || !profile.roll_number || !profile.roll_number.trim()) {
+          openCompleteProfileModal();
+        } else {
+          switchStudentSub('dashboard');
+        }
       }
 
       // Start real-time listeners (onSnapshot) for events & registrations
@@ -1291,6 +1403,7 @@ async function renderAdminAllRegistrationsList() {
 
     } else {
       // Signed out
+      stopCameraScanner();
       teardownRealtime();
       document.getElementById('subBtnDashboard').classList.add('hidden');
       toggleAdminDashboardView(false);

@@ -279,9 +279,10 @@ async function apiFetchEventsWithCounts() {
 async function apiFetchEventsAdmin(search = '') {
   const snap = await _db.collection('events').get();
   const events = [];
+  const s = (search || '').toLowerCase();
   snap.forEach(doc => {
     const ev = _shapeEvent(doc);
-    if (!search || ev.title.toLowerCase().includes(search.toLowerCase())) {
+    if (!s || ev.title.toLowerCase().includes(s) || (ev.venue || '').toLowerCase().includes(s) || (ev.description || '').toLowerCase().includes(s)) {
       eventLRUCache.put(ev.id, ev);
       events.push(ev);
     }
@@ -450,6 +451,7 @@ async function apiGetMyRegistrations() {
   const regs = [];
   snap.forEach(doc => {
     const d = doc.data();
+    if (d.eventId) registeredSet.add(d.eventId);
     regs.push({
       id:         doc.id,
       event_id:   d.eventId,
@@ -611,10 +613,11 @@ function setupRealtime({ onEventsChange, onRegsChange }) {
 
 function teardownRealtime() { _unsubscribeAll(); }
 
-// ─── CSV EXPORT (unchanged logic) ────────────────────────────────────────────
+// ─── CSV EXPORT (formula-injection protected) ───────────────────────────────
 function csvSafeCell(val) {
   const s = String(val ?? '');
-  const escaped = (s.startsWith('=') || s.startsWith('+') || s.startsWith('-') || s.startsWith('@'))
+  const trimmed = s.trim();
+  const escaped = (trimmed.startsWith('=') || trimmed.startsWith('+') || trimmed.startsWith('-') || trimmed.startsWith('@'))
     ? "'" + s : s;
   return '"' + escaped.replace(/"/g, '""') + '"';
 }
