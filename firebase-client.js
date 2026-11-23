@@ -254,7 +254,14 @@ async function apiFetchEventsWithCounts() {
     .where('uid', '==', user.uid)
     .get();
   const myRegs = {};
-  regSnap.forEach(d => { myRegs[d.data().eventId] = d.data().entryCode; });
+  regSnap.forEach(d => {
+    const data = d.data();
+    const evId = data.eventId || data.event_id;
+    const code = data.entryCode || data.entry_code || data.code;
+    if (evId && code) {
+      myRegs[evId] = code;
+    }
+  });
 
   const events = [];
   snap.forEach(doc => {
@@ -404,6 +411,7 @@ async function apiRegisterForEvent(eventId) {
           studentEmail: user.email,
           rollNumber:   profile?.roll_number || '',
           entryCode:    candidateCode,
+          entry_code:   candidateCode,
           entered:      false,
           enteredAt:    null,
           registeredAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -451,14 +459,16 @@ async function apiGetMyRegistrations() {
   const regs = [];
   snap.forEach(doc => {
     const d = doc.data();
-    if (d.eventId) registeredSet.add(d.eventId);
+    const eventId = d.eventId || d.event_id || '';
+    const entryCode = d.entryCode || d.entry_code || d.code || '';
+    if (eventId) registeredSet.add(eventId);
     regs.push({
       id:         doc.id,
-      event_id:   d.eventId,
-      entry_code: d.entryCode,
-      entered:    d.entered,
-      entered_at: d.enteredAt?.toDate?.() || null,
-      created_at: d.registeredAt?.toDate?.() || null
+      event_id:   eventId,
+      entry_code: entryCode,
+      entered:    !!d.entered,
+      entered_at: d.enteredAt?.toDate?.() || d.entered_at?.toDate?.() || null,
+      created_at: d.registeredAt?.toDate?.() || d.created_at?.toDate?.() || null
     });
   });
   regs.sort((a, b) => {
@@ -469,36 +479,51 @@ async function apiGetMyRegistrations() {
   return regs;
 }
 
-// Admin: verify an entry code (searches by entryCode field)
+// Admin: verify an entry code (searches by entryCode or entry_code)
 async function apiVerifyEntry(code) {
-  const snap = await _db.collection('registrations')
-    .where('entryCode', '==', code.trim().toUpperCase())
+  const cleanCode = code.trim().toUpperCase();
+  let snap = await _db.collection('registrations')
+    .where('entryCode', '==', cleanCode)
     .limit(1)
     .get();
+  if (snap.empty) {
+    snap = await _db.collection('registrations')
+      .where('entry_code', '==', cleanCode)
+      .limit(1)
+      .get();
+  }
   if (snap.empty) return null;
   const doc  = snap.docs[0];
   const d    = doc.data();
-  const evSnap = await _db.collection('events').doc(d.eventId).get();
+  const eventId = d.eventId || d.event_id || '';
+  const evSnap = eventId ? await _db.collection('events').doc(eventId).get() : { exists: false };
   const ev     = evSnap.exists ? evSnap.data() : {};
   return {
-    entry_code:  d.entryCode,
-    full_name:   d.studentName,
-    roll_number: d.rollNumber || '',
-    email:       d.studentEmail,
-    entered:     d.entered,
-    entered_at:  d.enteredAt?.toDate?.() || null,
-    event_title: ev.title || '',
-    event_venue: ev.venue || '',
+    entry_code:  d.entryCode || d.entry_code || cleanCode,
+    full_name:   d.studentName || d.name || 'Student',
+    roll_number: d.rollNumber || d.roll_number || '',
+    email:       d.studentEmail || d.email || '',
+    entered:     !!d.entered,
+    entered_at:  d.enteredAt?.toDate?.() || d.entered_at?.toDate?.() || null,
+    event_title: ev.title || 'College Event',
+    event_venue: ev.venue || 'Campus Hall',
     event_date:  ev.date  || ''
   };
 }
 
 // Admin: mark attendee as entered (atomic in Firestore transaction)
 async function apiMarkEntered(code) {
-  const snap = await _db.collection('registrations')
-    .where('entryCode', '==', code.trim().toUpperCase())
+  const cleanCode = code.trim().toUpperCase();
+  let snap = await _db.collection('registrations')
+    .where('entryCode', '==', cleanCode)
     .limit(1)
     .get();
+  if (snap.empty) {
+    snap = await _db.collection('registrations')
+      .where('entry_code', '==', cleanCode)
+      .limit(1)
+      .get();
+  }
   if (snap.empty) return { ok: false, error: 'INVALID_CODE' };
   const regRef = snap.docs[0].ref;
 

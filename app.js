@@ -13,6 +13,32 @@ let studentSearchQuery = '';
 let adminSearchQuery = '';
 
 // Dynamic script loader for on-demand lazy loading (Chart.js, html5-qrcode)
+
+// Render QR code reliably with automatic retry if library is initializing
+function renderQrCodeSafely(elementId, text) {
+  if (!text) return;
+  const tryRender = () => {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (window.QRCode) {
+      el.innerHTML = '';
+      try {
+        new QRCode(el, {
+          text: String(text).trim(),
+          width: 76,
+          height: 76,
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (err) {
+        console.warn('QR code generation error:', err);
+      }
+    } else {
+      setTimeout(tryRender, 100);
+    }
+  };
+  setTimeout(tryRender, 60);
+}
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -703,36 +729,41 @@ async function renderStudentMyRegistrations() {
       return;
     }
 
-    // Batch fetch event details to eliminate N+1 sequential queries
-    const uniqueIds = [...new Set(regs.map(r => r.event_id))];
+    // Batch fetch event details
+    const uniqueIds = [...new Set(regs.map(r => r.event_id).filter(id => !!id))];
     const eventObjects = await Promise.all(uniqueIds.map(id => apiFetchEventById(id)));
     const eventMap = {};
     uniqueIds.forEach((id, i) => {
-      eventMap[id] = eventObjects[i] || { title: 'College Event', date: '', venue: '' };
+      eventMap[id] = eventObjects[i] || null;
     });
 
-    for (const r of regs) {
-      const event = eventMap[r.event_id] || { title: 'College Event', date: '', venue: '' };
+    for (let i = 0; i < regs.length; i++) {
+      const r = regs[i];
+      const event = (r.event_id && eventMap[r.event_id]) ? eventMap[r.event_id] : null;
+      const title = event?.title || (r.event_id ? `Event (${r.event_id})` : 'College Event Pass');
+      const date = event?.date || 'Registered Event';
+      const venue = event?.venue || 'Campus';
+      const isEntered = !!r.entered;
+      const code = r.entry_code || (r.id ? 'PASS-' + r.id.substring(0, 6).toUpperCase() : `PASS-${i+1}`);
+      const qrId = `qr_pass_${i}_${code}`;
+
       const card = document.createElement('div');
       card.className = 'p-4 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4';
-
-      const isEntered = !!r.entered;
-      const qrId = `qr_${r.entry_code}`;
 
       card.innerHTML = `
         <div class="flex-grow space-y-1">
           <div class="flex items-center gap-2">
-            <h4 class="text-sm font-bold text-slate-900">${escapeHtml(event.title)}</h4>
+            <h4 class="text-sm font-bold text-slate-900">${escapeHtml(title)}</h4>
             ${isEntered
               ? '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Entered</span>'
               : '<span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pending</span>'
             }
           </div>
           <div class="text-xs text-slate-500">
-            <span>📅 ${escapeHtml(event.date || 'TBD')}</span> • <span>📍 ${escapeHtml(event.venue || 'Campus')}</span>
+            <span>📅 ${escapeHtml(date)}</span> • <span>📍 ${escapeHtml(venue)}</span>
           </div>
           <div class="text-xs font-mono font-bold text-blue-600 mt-1">
-            ENTRY CODE: <span class="bg-blue-50 px-2 py-1 rounded border border-blue-200 text-blue-700 text-xs">${escapeHtml(r.entry_code)}</span>
+            ENTRY CODE: <span class="bg-blue-50 px-2 py-1 rounded border border-blue-200 text-blue-700 text-xs font-bold">${escapeHtml(code)}</span>
           </div>
         </div>
         <div class="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-xl border border-slate-200 shrink-0">
@@ -742,19 +773,8 @@ async function renderStudentMyRegistrations() {
       `;
       container.appendChild(card);
 
-      // Render QR code encoding ONLY the entry code (no personal info)
-      setTimeout(() => {
-        const qrEl = document.getElementById(qrId);
-        if (qrEl && window.QRCode) {
-          qrEl.innerHTML = '';
-          new QRCode(qrEl, {
-            text: r.entry_code,
-            width: 76,
-            height: 76,
-            correctLevel: QRCode.CorrectLevel.M
-          });
-        }
-      }, 50);
+      // Render QR code reliably
+      renderQrCodeSafely(qrId, code);
     }
   } catch (err) {
     console.error('Fetch registrations error:', err);
