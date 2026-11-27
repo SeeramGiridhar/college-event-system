@@ -14,6 +14,12 @@ let _cameraCancelled = false;
 let studentSearchQuery = '';
 let adminSearchQuery = '';
 let _cachedStudentEvents = null;
+let _cachedAdminEvents = null;
+let _regsRenderSeq = 0;
+let _studentEventsRenderSeq = 0;
+let _adminEventsRenderSeq = 0;
+let _adminAuthInProgress = false;
+let _signUpInProgress = false;
 let _lastActiveElement = null;
 
 function loadScript(src) {
@@ -92,6 +98,7 @@ updateClock();
 function showModal(title, message, type = 'info') {
   const modal = document.getElementById('customModal');
   if (!modal) return;
+  _lastActiveElement = document.activeElement;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalMessage').textContent = message;
   const icon = document.getElementById('modalIcon');
@@ -106,11 +113,39 @@ function showModal(title, message, type = 'info') {
     icon.className = 'w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg';
   }
   modal.classList.remove('hidden');
+  setTimeout(() => modal.querySelector('button')?.focus(), 50);
 }
 
 function closeCustomModal() {
   const modal = document.getElementById('customModal');
   if (modal) modal.classList.add('hidden');
+  if (_lastActiveElement && typeof _lastActiveElement.focus === 'function') {
+    _lastActiveElement.focus();
+    _lastActiveElement = null;
+  }
+}
+
+function clearPortalUIState() {
+  _cachedStudentEvents = null;
+  _cachedAdminEvents = null;
+  _regsRenderSeq++;
+  _studentEventsRenderSeq++;
+  _adminEventsRenderSeq++;
+  const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  const setHtml = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  setText('studentWelcomeBanner', 'Welcome, Student');
+  setText('studentEmailBanner', '');
+  setText('eventCountBadge', '0 Events');
+  setText('regCountBadge', '0 Passes');
+  setText('adminTotalRegsBadge', '0 Records');
+  setHtml('studentEventsList', '');
+  setHtml('studentMyRegsList', '');
+  setHtml('adminEventsList', '');
+  setHtml('adminAllRegsList', '');
+  setHtml('adminEventSummaryTableBody', '');
+  setHtml('adminStatsPills', '');
+  setText('loginMsg', '');
+  setText('regMsg', '');
 }
 
 function renderSkeletonCards(container, count = 2) {
@@ -150,6 +185,8 @@ function switchWindow(windowName) {
     studentBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-blue-600 text-white shadow-md';
     adminBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 text-slate-300 hover:text-white';
     headerSub.textContent = 'Student portal & event registrations';
+    const adminMsg = document.getElementById('adminLoginMsg');
+    if (adminMsg) adminMsg.textContent = '';
 
     if (currentUser && activePortal === 'student') {
       switchStudentSub('dashboard');
@@ -162,11 +199,13 @@ function switchWindow(windowName) {
     adminBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-amber-500 text-white shadow-md';
     studentBtn.className = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 text-slate-300 hover:text-white';
     headerSub.textContent = 'Admin management & ticket verification gateway';
+    const loginMsg = document.getElementById('loginMsg');
+    if (loginMsg) loginMsg.textContent = '';
 
     if (currentUser && activePortal === 'admin') {
       toggleAdminDashboardView(true);
     } else {
-      toggleAdminDashboardView(false);
+      toggleAdminDashboardView(false, true);
     }
   }
 }
@@ -224,7 +263,7 @@ function switchStudentSub(subName) {
   }
 }
 
-function toggleAdminDashboardView(isLoggedIn) {
+function toggleAdminDashboardView(isLoggedIn, preserveMsg = false) {
   const loginCard = document.getElementById('adminLoginCard');
   const dashboardContent = document.getElementById('adminDashboardContent');
   const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
@@ -238,7 +277,7 @@ function toggleAdminDashboardView(isLoggedIn) {
   } else {
     loginCard.classList.remove('hidden');
     dashboardContent.classList.add('hidden');
-    clearAdminLogin();
+    clearAdminLogin(preserveMsg);
   }
 }
 
@@ -263,12 +302,39 @@ async function handleStudentRegister() {
   regMsg.textContent = 'Creating account...';
   regMsg.className = 'mt-3 text-xs font-medium text-blue-600';
 
+  _signUpInProgress = true;
+  sessionStorage.setItem('cem_active_portal', 'student');
   try {
     const data = await authSignUp({ email, password: pass, fullName: name, rollNumber: roll });
     if (data.session) {
       regMsg.textContent = 'Account created successfully! Logging you in...';
       regMsg.className = 'mt-3 text-xs font-medium text-emerald-600';
-      setTimeout(() => switchStudentSub('dashboard'), 800);
+      clearPortalUIState();
+      setTimeout(() => {
+        switchStudentSub('dashboard');
+        setupRealtime({
+          onEventsChange: () => {
+            _cachedStudentEvents = null;
+            if (!document.getElementById('studentWindow').classList.contains('hidden')) {
+              renderStudentEvents(true);
+            } else {
+              _cachedAdminEvents = null;
+              renderAdminDashboard();
+            }
+          },
+          onRegsChange: () => {
+            _cachedStudentEvents = null;
+            if (!document.getElementById('studentWindow').classList.contains('hidden')) {
+              renderStudentEvents(true);
+              renderStudentMyRegistrations();
+            } else {
+              renderAdminStats();
+              renderAdminEventSummaryTable();
+              renderAdminAllRegistrationsList();
+            }
+          }
+        });
+      }, 300);
     } else {
       regMsg.textContent = 'Account created! Please check your email inbox to confirm your email before signing in.';
       regMsg.className = 'mt-3 text-xs font-medium text-emerald-600';
@@ -284,6 +350,8 @@ async function handleStudentRegister() {
     }
     regMsg.textContent = msg;
     regMsg.className = 'mt-3 text-xs font-medium text-rose-600';
+  } finally {
+    _signUpInProgress = false;
   }
 }
 
@@ -349,7 +417,8 @@ async function handleGoogleSignIn() {
   try {
     sessionStorage.setItem('cem_active_portal', 'student');
     toggleAdminDashboardView(false);
-    await authSignInWithGoogle();
+    const res = await authSignInWithGoogle();
+    if (!res) return;
     const profile = await getMyProfile();
     if (!profile || !profile.roll_number || !profile.roll_number.trim()) {
       openCompleteProfileModal();
@@ -364,6 +433,7 @@ async function handleGoogleSignIn() {
 
 async function handleStudentLogout() {
   sessionStorage.removeItem('cem_active_portal');
+  clearPortalUIState();
   await authSignOut();
   switchStudentSub('login');
   toggleAdminDashboardView(false);
@@ -372,7 +442,11 @@ async function handleStudentLogout() {
 // Profile Completion Modal (for Google OAuth users without roll number)
 function openCompleteProfileModal() {
   const modal = document.getElementById('completeProfileModal');
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    _lastActiveElement = document.activeElement;
+    modal.classList.remove('hidden');
+    setTimeout(() => document.getElementById('cpFullName')?.focus(), 50);
+  }
 }
 
 async function closeCompleteProfileModal() {
@@ -384,6 +458,10 @@ async function closeCompleteProfileModal() {
   }
   const modal = document.getElementById('completeProfileModal');
   if (modal) modal.classList.add('hidden');
+  if (_lastActiveElement && typeof _lastActiveElement.focus === 'function') {
+    _lastActiveElement.focus();
+    _lastActiveElement = null;
+  }
 }
 
 async function handleSaveCompleteProfile() {
@@ -539,6 +617,7 @@ async function handleAdminLogin() {
   loginMsg.className = 'text-xs font-medium text-amber-600';
   if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Verifying...'; }
 
+  _adminAuthInProgress = true;
   try {
     await authSignIn({ email, password: pass });
 
@@ -546,7 +625,7 @@ async function handleAdminLogin() {
 
     if (!profile || profile.role !== 'admin') {
       await authSignOut();
-      loginMsg.textContent = 'This account does not have administrator privileges.';
+      loginMsg.textContent = 'Access denied: This account does not have administrator privileges.';
       loginMsg.className = 'text-xs font-medium text-rose-600';
       return;
     }
@@ -555,7 +634,31 @@ async function handleAdminLogin() {
     switchStudentSub('login');
     loginMsg.textContent = 'Admin access granted!';
     loginMsg.className = 'text-xs font-medium text-emerald-600';
-    setTimeout(() => toggleAdminDashboardView(true), 400);
+    setTimeout(() => {
+      toggleAdminDashboardView(true);
+      setupRealtime({
+        onEventsChange: () => {
+          _cachedStudentEvents = null;
+          _cachedAdminEvents = null;
+          if (!document.getElementById('studentWindow').classList.contains('hidden')) {
+            renderStudentEvents(true);
+          } else {
+            renderAdminDashboard();
+          }
+        },
+        onRegsChange: () => {
+          _cachedStudentEvents = null;
+          if (!document.getElementById('studentWindow').classList.contains('hidden')) {
+            renderStudentEvents(true);
+            renderStudentMyRegistrations();
+          } else {
+            renderAdminStats();
+            renderAdminEventSummaryTable();
+            renderAdminAllRegistrationsList();
+          }
+        }
+      });
+    }, 300);
   } catch (err) {
     console.error('Admin login error:', err);
     let msg = err.message || 'Authentication failed.';
@@ -565,6 +668,7 @@ async function handleAdminLogin() {
     loginMsg.textContent = msg;
     loginMsg.className = 'text-xs font-medium text-rose-600';
   } finally {
+    _adminAuthInProgress = false;
     if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login as Admin'; }
   }
 }
@@ -573,8 +677,14 @@ async function handleAdminGoogleSignIn() {
   const loginMsg = document.getElementById('adminLoginMsg');
   loginMsg.textContent = 'Authenticating with Google...';
   loginMsg.className = 'text-xs font-medium text-amber-600';
+  _adminAuthInProgress = true;
   try {
     const result = await authSignInWithGoogle();
+    if (!result) {
+      loginMsg.textContent = 'Google sign-in cancelled.';
+      loginMsg.className = 'text-xs font-medium text-slate-500';
+      return;
+    }
     const user = (result && result.user) ? result.user : firebase.auth().currentUser;
     if (!user) throw new Error('No user returned from Google sign in.');
 
@@ -582,7 +692,7 @@ async function handleAdminGoogleSignIn() {
 
     if (!profile || profile.role !== 'admin') {
       await authSignOut();
-      loginMsg.textContent = 'Google account ' + (user.email || '') + ' does not have administrator privileges.';
+      loginMsg.textContent = 'Access denied: Google account ' + (user.email || '') + ' does not have administrator privileges.';
       loginMsg.className = 'text-xs font-medium text-rose-600';
       return;
     }
@@ -591,23 +701,26 @@ async function handleAdminGoogleSignIn() {
     switchStudentSub('login');
     loginMsg.textContent = 'Admin access granted!';
     loginMsg.className = 'text-xs font-medium text-emerald-600';
-    setTimeout(() => toggleAdminDashboardView(true), 400);
+    setTimeout(() => toggleAdminDashboardView(true), 300);
   } catch (err) {
     console.error('Admin Google sign-in error:', err);
     loginMsg.textContent = err.message || 'Google sign-in failed.';
     loginMsg.className = 'text-xs font-medium text-rose-600';
+  } finally {
+    _adminAuthInProgress = false;
   }
 }
 
-function clearAdminLogin() {
+function clearAdminLogin(preserveMsg = false) {
   document.getElementById('adminEmail').value = '';
   document.getElementById('adminPass').value = '';
-  document.getElementById('adminLoginMsg').textContent = '';
+  if (!preserveMsg) document.getElementById('adminLoginMsg').textContent = '';
 }
 
 async function handleAdminLogout() {
   stopCameraScanner();
   sessionStorage.removeItem('cem_active_portal');
+  clearPortalUIState();
   await authSignOut();
   toggleAdminDashboardView(false);
   switchStudentSub('login');
@@ -639,6 +752,7 @@ const debouncedStudentSearch = debounce((val) => {
 }, 300);
 
 async function renderStudentEvents(forceReload = false) {
+  const seq = ++_studentEventsRenderSeq;
   const container = document.getElementById('studentEventsList');
   const countBadge = document.getElementById('eventCountBadge');
   if (forceReload || !_cachedStudentEvents) {
@@ -649,6 +763,7 @@ async function renderStudentEvents(forceReload = false) {
     if (forceReload || !_cachedStudentEvents) {
       _cachedStudentEvents = await apiFetchEventsWithCounts();
     }
+    if (seq !== _studentEventsRenderSeq) return;
     const events = _cachedStudentEvents || [];
     let filtered = events;
     if (studentSearchQuery) {
@@ -755,16 +870,17 @@ async function handleStudentRegisterForEvent(eventId, btn = null) {
 }
 
 async function renderStudentMyRegistrations() {
+  const seq = ++_regsRenderSeq;
   const container = document.getElementById('studentMyRegsList');
   const countBadge = document.getElementById('regCountBadge');
   renderSkeletonCards(container, 1);
 
   try {
     const regs = await apiGetMyRegistrations();
-    countBadge.textContent = `${regs.length} Passes`;
-    container.innerHTML = '';
+    if (seq !== _regsRenderSeq) return;
 
     if (regs.length === 0) {
+      countBadge.textContent = '0 Passes';
       container.innerHTML = '<div class="text-center py-10 text-slate-400 text-xs">You have not registered for any events yet.</div>';
       return;
     }
@@ -772,10 +888,15 @@ async function renderStudentMyRegistrations() {
     // Batch fetch event details
     const uniqueIds = [...new Set(regs.map(r => r.event_id).filter(id => !!id))];
     const eventObjects = await Promise.all(uniqueIds.map(id => apiFetchEventById(id)));
+    if (seq !== _regsRenderSeq) return;
+
     const eventMap = {};
     uniqueIds.forEach((id, i) => {
       eventMap[id] = eventObjects[i] || null;
     });
+
+    countBadge.textContent = `${regs.length} Passes`;
+    container.innerHTML = '';
 
     for (let i = 0; i < regs.length; i++) {
       const r = regs[i];
@@ -827,12 +948,13 @@ async function renderStudentMyRegistrations() {
 // ============================================================================
 async function renderAdminDashboard() {
   try {
-    // Single consolidated fetch to eliminate duplicate queries across sub-components
+    // Single consolidated unfiltered fetch; search filtering runs locally without distorting analytics
     const [events, regs, profiles] = await Promise.all([
-      apiFetchEventsAdmin(adminSearchQuery),
+      apiFetchEventsAdmin(''),
       apiGetAllRegistrationsAdmin(),
       apiGetAllProfilesAdmin()
     ]);
+    _cachedAdminEvents = events;
     await Promise.all([
       renderAdminEventsList(events),
       renderAdminStats(events, regs),
@@ -847,15 +969,29 @@ async function renderAdminDashboard() {
 const debouncedAdminSearch = debounce((val) => {
   adminSearchQuery = (val || '').toLowerCase().trim();
   renderAdminEventsList();
-  renderAdminEventSummaryTable();
 }, 300);
 
 async function renderAdminEventsList(preloadedEvents = null) {
+  const seq = ++_adminEventsRenderSeq;
   const container = document.getElementById('adminEventsList');
-  if (!preloadedEvents) renderSkeletonCards(container, 2);
+  if (!preloadedEvents && !_cachedAdminEvents) renderSkeletonCards(container, 2);
 
   try {
-    const events = preloadedEvents !== null ? preloadedEvents : await apiFetchEventsAdmin(adminSearchQuery);
+    if (preloadedEvents !== null) {
+      _cachedAdminEvents = preloadedEvents;
+    } else if (!_cachedAdminEvents) {
+      _cachedAdminEvents = await apiFetchEventsAdmin('');
+    }
+    if (seq !== _adminEventsRenderSeq) return;
+
+    const allEvents = _cachedAdminEvents || [];
+    const events = adminSearchQuery
+      ? allEvents.filter(ev =>
+          ev.title.toLowerCase().includes(adminSearchQuery) ||
+          (ev.venue || '').toLowerCase().includes(adminSearchQuery) ||
+          (ev.description || '').toLowerCase().includes(adminSearchQuery)
+        )
+      : allEvents;
     container.innerHTML = '';
 
     if (events.length === 0) {
@@ -931,9 +1067,8 @@ async function handleCreateEvent() {
     return;
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (date < todayStr) {
-    msgEl.textContent = 'Event date cannot be in the past.';
+  if (isEventExpired(date, time)) {
+    msgEl.textContent = 'Event date/time cannot be in the past (IST).';
     msgEl.className = 'mt-2 text-xs font-medium text-rose-600';
     return;
   }
@@ -977,8 +1112,9 @@ function clearEventForm() {
 
 // Edit Event Modal
 async function openEditEventModal(id) {
-  const event = await apiFetchEventById(id);
+  const event = await apiFetchEventById(id, true);
   if (!event) return;
+  _lastActiveElement = document.activeElement;
   document.getElementById('editEvId').value = event.id;
   document.getElementById('editEvTitle').value = event.title;
   document.getElementById('editEvDate').value = event.date;
@@ -988,10 +1124,15 @@ async function openEditEventModal(id) {
   document.getElementById('editEvDesc').value = event.description || '';
   document.getElementById('editEvMsg').textContent = '';
   document.getElementById('editEventModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('editEvTitle')?.focus(), 50);
 }
 
 function closeEditEventModal() {
   document.getElementById('editEventModal').classList.add('hidden');
+  if (_lastActiveElement && typeof _lastActiveElement.focus === 'function') {
+    _lastActiveElement.focus();
+    _lastActiveElement = null;
+  }
 }
 
 async function handleSaveEditEvent() {
@@ -1010,6 +1151,12 @@ async function handleSaveEditEvent() {
     return;
   }
 
+  if (isEventExpired(date, time)) {
+    msgEl.textContent = 'Event date/time cannot be in the past (IST).';
+    msgEl.className = 'text-xs font-medium text-rose-600';
+    return;
+  }
+
   if (!capRaw || !/^\d+$/.test(capRaw)) {
     msgEl.textContent = 'Capacity must be a valid whole number (no fractions or decimals).';
     msgEl.className = 'text-xs font-medium text-rose-600';
@@ -1022,7 +1169,7 @@ async function handleSaveEditEvent() {
     return;
   }
 
-  const currentEv = await apiFetchEventById(id);
+  const currentEv = await apiFetchEventById(id, true);
   const confirmedCount = currentEv?.registeredCount || 0;
   if (capacity < confirmedCount) {
     msgEl.textContent = `Capacity cannot be lower than confirmed bookings (${confirmedCount}).`;
@@ -1417,8 +1564,12 @@ async function renderAdminAllRegistrationsList(preloadedRegs = null, preloadedPr
     }
 
     regs.forEach(r => {
-      const stu = profiles.find(p => p.id === r.user_id) || { full_name: 'Student', roll_number: 'N/A' };
-      const ev = events.find(e => e.id === r.event_id) || { title: 'College Event' };
+      const profileMatch = profiles.find(p => p.id === r.user_id);
+      const stu = {
+        full_name: profileMatch?.full_name || r.student_name || 'Student',
+        roll_number: profileMatch?.roll_number || r.roll_number || 'N/A'
+      };
+      const ev = events.find(e => e.id === r.event_id) || { title: 'Archived / Deleted Event' };
       const isEntered = !!r.entered;
 
       const card = document.createElement('div');
@@ -1491,31 +1642,34 @@ function setupKeyboardShortcuts() {
     const val = document.getElementById('adminEventSearch')?.value;
     adminSearchQuery = (val || '').toLowerCase().trim();
     renderAdminEventsList();
-    renderAdminEventSummaryTable();
   });
 
-  // Global Escape Key Listener for Accessible Dialog Dismissal
+  // Global Escape Key & Tab Focus Trap Listener for Accessible Modals
   document.addEventListener('keydown', (e) => {
+    const modalIds = ['customModal', 'editEventModal', 'resetPasswordModal', 'forgotPasswordModal', 'completeProfileModal'];
+    const openModalEl = modalIds.map(id => document.getElementById(id)).find(el => el && !el.classList.contains('hidden'));
+    if (!openModalEl) return;
+
     if (e.key === 'Escape') {
-      const forgotModal = document.getElementById('forgotPasswordModal');
-      if (forgotModal && !forgotModal.classList.contains('hidden')) {
-        toggleForgotPasswordModal(false);
-        return;
-      }
-      const resetModal = document.getElementById('resetPasswordModal');
-      if (resetModal && !resetModal.classList.contains('hidden')) {
-        closeResetPasswordModal();
-        return;
-      }
-      const editModal = document.getElementById('editEventModal');
-      if (editModal && !editModal.classList.contains('hidden')) {
-        closeEditEventModal();
-        return;
-      }
-      const customModal = document.getElementById('customModal');
-      if (customModal && !customModal.classList.contains('hidden')) {
-        closeModal();
-        return;
+      if (openModalEl.id === 'forgotPasswordModal') { toggleForgotPasswordModal(false); return; }
+      if (openModalEl.id === 'resetPasswordModal') { closeResetPasswordModal(); return; }
+      if (openModalEl.id === 'editEventModal') { closeEditEventModal(); return; }
+      if (openModalEl.id === 'customModal') { closeCustomModal(); return; }
+      if (openModalEl.id === 'completeProfileModal') { closeCompleteProfileModal(); return; }
+    }
+
+    if (e.key === 'Tab') {
+      const focusables = Array.from(openModalEl.querySelectorAll('button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+        .filter(el => el.offsetParent !== null);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     }
   });
@@ -1525,9 +1679,19 @@ function setupKeyboardShortcuts() {
 // ============================================================================
 (function initSystem() {
   setupKeyboardShortcuts();
+
+  // Synchronous portal hint on reload to prevent flashing Student Login before Admin session restores
+  if (sessionStorage.getItem('cem_active_portal') === 'admin') {
+    switchWindow('admin');
+  }
+
   // Firebase onAuthStateChanged fires on every page load and login/logout
   firebase.auth().onAuthStateChanged(async (user) => {
     if (user) {
+      if (_adminAuthInProgress || _signUpInProgress) {
+        return; // Explicit login/signup flow is handling verification & transition cleanly
+      }
+
       // User is signed in — read their role from Firestore
       let profile = null;
       try { profile = await getMyProfile(); } catch (e) { console.warn(e); }
@@ -1547,6 +1711,7 @@ function setupKeyboardShortcuts() {
         toggleAdminDashboardView(true);
         switchStudentSub('login');
       } else {
+        if (activePortal === 'admin') sessionStorage.setItem('cem_active_portal', 'student');
         toggleAdminDashboardView(false);
         // Enforce roll number completion for Google OAuth users even after reload
         if (!profile || !profile.roll_number || !profile.roll_number.trim()) {
@@ -1560,6 +1725,7 @@ function setupKeyboardShortcuts() {
       setupRealtime({
         onEventsChange: () => {
           _cachedStudentEvents = null;
+          _cachedAdminEvents = null;
           if (!document.getElementById('studentWindow').classList.contains('hidden')) {
             renderStudentEvents(true);
           } else {
@@ -1583,10 +1749,15 @@ function setupKeyboardShortcuts() {
       // Signed out
       stopCameraScanner();
       teardownRealtime();
+      clearPortalUIState();
       document.getElementById('subBtnDashboard').classList.add('hidden');
-      toggleAdminDashboardView(false);
-      switchWindow('student');
-      switchStudentSub('login');
+      const adminWin = document.getElementById('adminWindow');
+      const isOnAdminLogin = _adminAuthInProgress || (adminWin && !adminWin.classList.contains('hidden') && !document.getElementById('adminLoginCard').classList.contains('hidden'));
+      toggleAdminDashboardView(false, isOnAdminLogin);
+      if (!isOnAdminLogin) {
+        switchWindow('student');
+        switchStudentSub('login');
+      }
     }
   });
 })();

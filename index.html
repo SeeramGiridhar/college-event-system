@@ -78,7 +78,7 @@
 
 <body class="h-full bg-slate-100 text-slate-800 antialiased flex flex-col items-center justify-start overflow-x-hidden selection:bg-blue-500 selection:text-white">
 
-  <div class="w-full max-w-7xl mx-auto p-4 sm:p-6 flex flex-col min-h-screen">
+  <div class="w-full max-w-7xl mx-auto p-4 sm:p-6 pb-20 sm:pb-16 flex flex-col min-h-screen">
 
     <!-- Top Header -->
     <header class="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
@@ -157,7 +157,7 @@
                 <div>
                   <label for="regRoll" class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
                   <input id="regRoll" type="text"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono uppercase"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono [&:not(:placeholder-shown)]:uppercase"
                     placeholder="e.g. 21A91A05G1" />
                 </div>
                 <div>
@@ -324,7 +324,7 @@
                   </h3>
                   <p class="text-xs text-slate-500">Browse upcoming events and register instantly</p>
                 </div>
-                <span id="eventCountBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">0 Events</span>
+                <span id="eventCountBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full shrink-0 whitespace-nowrap">0 Events</span>
               </div>
               <div class="mb-3">
                 <input id="studentEventSearch" type="text" placeholder="🔍 Search events (title, venue)..."
@@ -346,7 +346,7 @@
                   </h3>
                   <p class="text-xs text-slate-500">Present your unique entry codes or QR passes at event gates</p>
                 </div>
-                <span id="regCountBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">0 Passes</span>
+                <span id="regCountBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full shrink-0 whitespace-nowrap">0 Passes</span>
               </div>
               <div id="studentMyRegsList" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-1">
                 <!-- Populated dynamically -->
@@ -614,7 +614,7 @@
                 </h3>
                 <p class="text-xs text-slate-500">Audit trail of all student event registrations and gate entry statuses</p>
               </div>
-              <span id="adminTotalRegsBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">0 Records</span>
+              <span id="adminTotalRegsBadge" class="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full shrink-0 whitespace-nowrap">0 Records</span>
             </div>
             <div id="adminAllRegsList" class="max-h-[350px] overflow-y-auto custom-scrollbar space-y-3 pr-1">
               <!-- Populated dynamically -->
@@ -628,7 +628,7 @@
     </main>
 
     <!-- Custom Notification Modal -->
-    <div id="customModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="customModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
         <div class="flex items-center gap-3">
           <div id="modalIcon" class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">ℹ️</div>
@@ -649,7 +649,7 @@
     </div>
 
     <!-- Complete Profile Modal (Google OAuth first-time login) -->
-    <div id="completeProfileModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="completeProfileModal" role="dialog" aria-modal="true" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -671,7 +671,7 @@
           <div>
             <label for="cpRollNumber" class="block text-xs font-medium text-slate-600 mb-1">Roll Number</label>
             <input id="cpRollNumber" type="text"
-              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono uppercase"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono [&:not(:placeholder-shown)]:uppercase"
               placeholder="e.g. 21A91A05G1" />
           </div>
           <div id="cpMsg" class="text-xs font-medium"></div>
@@ -688,7 +688,7 @@
     </div>
 
     <!-- Forgot Password Modal -->
-    <div id="forgotPasswordModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="forgotPasswordModal" role="dialog" aria-modal="true" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-lg">🔑</div>
@@ -716,7 +716,7 @@
     </div>
 
     <!-- Set New Password Modal (PASSWORD_RECOVERY) -->
-    <div id="resetPasswordModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="resetPasswordModal" role="dialog" aria-modal="true" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">🔒</div>
@@ -755,7 +755,7 @@
     </div>
 
     <!-- Edit Event Modal -->
-    <div id="editEventModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="editEventModal" role="dialog" aria-modal="true" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 transform transition-all animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <h4 class="text-base font-bold text-slate-900">Edit Event</h4>
